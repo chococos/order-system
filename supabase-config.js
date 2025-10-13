@@ -4,8 +4,8 @@
 const SUPABASE_CONFIG = {
     // Supabaseプロジェクトの設定
     // これらの値は、Supabaseダッシュボードの Settings > API から取得できます
-    url: 'https://jbwbrxjiujihsnymsipw.supabase.co',
-    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Impid2JyeGppdWppaHNueW1zaXB3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk0NzUzOTYsImV4cCI6MjA3NTA1MTM5Nn0.Fxg7t4b9IAE2_eW71ypX1wtVnWLdnAV_mjT8jbJy3rM',
+    url: 'https://kuzzsdohhkyrtquaqrne.supabase.co',
+    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt1enpzZG9oaGt5cnRxdWFxcm5lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAzMzA5MzMsImV4cCI6MjA3NTkwNjkzM30.ItbzrXtOjGLixxp8Ba8Ibkfqwq_9RLpwNVR-hyhNca4',
     
     // オプション設定
     options: {
