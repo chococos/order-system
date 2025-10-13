@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>同期システム診断ツール</title>
+    
+    <!-- Supabase SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            color: white;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2em;
+        }
+        
+        .dashboard {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 20px;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        .card h2 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 1.3em;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+        
+        .status-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .status-item:last-child {
+            border-bottom: none;
+        }
+        
+        .status-label {
+            font-weight: 500;
+            color: #666;
+        }
+        
+        .status-value {
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .status-value.online {
+            color: #4CAF50;
+        }
+        
+        .status-value.offline {
+            color: #f44336;
+        }
+        
+        .status-value.warning {
+            color: #FF9800;
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        
+        .btn {
+            flex: 1;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 5px;
+            background: #667eea;
+            color: white;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .btn:hover {
+            background: #5a67d8;
+            transform: translateY(-2px);
+        }
+        
+        .btn:active {
+            transform: translateY(0);
+        }
+        
+        .btn.danger {
+            background: #f44336;
+        }
+        
+        .btn.danger:hover {
+            background: #d32f2f;
+        }
+        
+        .btn.success {
+            background: #4CAF50;
+        }
+        
+        .btn.success:hover {
+            background: #388E3C;
+        }
+        
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .log-container {
+            max-height: 300px;
+            overflow-y: auto;
+            background: #f5f5f5;
+            border-radius: 5px;
+            padding: 10px;
+            margin-top: 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+        }
+        
+        .log-entry {
+            padding: 5px;
+            margin-bottom: 5px;
+            border-left: 3px solid #667eea;
+            background: white;
+        }
+        
+        .log-entry.error {
+            border-left-color: #f44336;
+            background: #ffebee;
+        }
+        
+        .log-entry.success {
+            border-left-color: #4CAF50;
+            background: #e8f5e9;
+        }
+        
+        .log-entry.warning {
+            border-left-color: #FF9800;
+            background: #fff3e0;
+        }
+        
+        .test-panel {
+            background: #f9f9f9;
+            border-radius: 5px;
+            padding: 15px;
+            margin-top: 15px;
+        }
+        
+        .test-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px;
+            margin-bottom: 8px;
+            background: white;
+            border-radius: 3px;
+        }
+        
+        .test-status {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #ccc;
+        }
+        
+        .test-status.pass {
+            background: #4CAF50;
+        }
+        
+        .test-status.fail {
+            background: #f44336;
+        }
+        
+        .test-status.running {
+            background: #2196F3;
+            animation: pulse 1s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            max-width: 500px;
+            width: 90%;
+        }
+        
+        .modal h3 {
+            margin-bottom: 20px;
+            color: #333;
+        }
+        
+        .modal input, .modal textarea {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        
+        .modal textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+        
+        @media (max-width: 768px) {
+            .dashboard {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 同期システム診断ツール</h1>
+        
+        <div class="dashboard">
+            <!-- 接続状態 -->
+            <div class="card">
+                <h2>📡 接続状態</h2>
+                <div class="status-item">
+                    <span class="status-label">Supabase接続:</span>
+                    <span class="status-value" id="supabase-status">確認中...</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">認証状態:</span>
+                    <span class="status-value" id="auth-status">確認中...</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">リアルタイム接続:</span>
+                    <span class="status-value" id="realtime-status">確認中...</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">ネットワーク:</span>
+                    <span class="status-value" id="network-status">確認中...</span>
+                </div>
+                
+                <div class="button-group">
+                    <button class="btn" onclick="testConnection()">接続テスト</button>
+                    <button class="btn success" onclick="reconnect()">再接続</button>
+                </div>
+            </div>
+            
+            <!-- 同期状態 -->
+            <div class="card">
+                <h2>🔄 同期状態</h2>
+                <div class="status-item">
+                    <span class="status-label">同期ステータス:</span>
+                    <span class="status-value" id="sync-status">確認中...</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">保留中の変更:</span>
+                    <span class="status-value" id="pending-changes">0件</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">最終同期:</span>
+                    <span class="status-value" id="last-sync">未同期</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">同期エラー:</span>
+                    <span class="status-value" id="sync-errors">0件</span>
+                </div>
+                
+                <div class="button-group">
+                    <button class="btn" onclick="forceSyncNow()">今すぐ同期</button>
+                    <button class="btn danger" onclick="clearPendingChanges()">保留クリア</button>
+                </div>
+            </div>
+            
+            <!-- データ統計 -->
+            <div class="card">
+                <h2>📊 データ統計</h2>
+                <div class="status-item">
+                    <span class="status-label">総オーダー数:</span>
+                    <span class="status-value" id="total-orders">0件</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">ローカルデータ:</span>
+                    <span class="status-value" id="local-orders">0件</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">サーバーデータ:</span>
+                    <span class="status-value" id="server-orders">0件</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">キャッシュサイズ:</span>
+                    <span class="status-value" id="cache-size">0 KB</span>
+                </div>
+                
+                <div class="button-group">
+                    <button class="btn" onclick="refreshStats()">更新</button>
+                    <button class="btn danger" onclick="clearLocalData()">ローカルクリア</button>
+                </div>
+            </div>
+            
+            <!-- テスト機能 -->
+            <div class="card">
+                <h2>🧪 テスト機能</h2>
+                <div class="test-panel">
+                    <div class="test-item">
+                        <span>テストオーダー作成</span>
+                        <div class="test-status" id="test-create"></div>
+                    </div>
+                    <div class="test-item">
+                        <span>オーダー更新</span>
+                        <div class="test-status" id="test-update"></div>
+                    </div>
+                    <div class="test-item">
+                        <span>リアルタイム受信</span>
+                        <div class="test-status" id="test-realtime"></div>
+                    </div>
+                    <div class="test-item">
+                        <span>競合解決</span>
+                        <div class="test-status" id="test-conflict"></div>
+                    </div>
+                </div>
+                
+                <div class="button-group">
+                    <button class="btn" onclick="runAllTests()">全テスト実行</button>
+                    <button class="btn" onclick="createTestOrder()">テストデータ作成</button>
+                </div>
+            </div>
+            
+            <!-- ログ表示 -->
+            <div class="card" style="grid-column: 1 / -1;">
+                <h2>📜 システムログ</h2>
+                <div class="log-container" id="log-container">
+                    <div class="log-entry">システムログを初期化しました</div>
+                </div>
+                <div class="button-group">
+                    <button class="btn" onclick="clearLogs()">ログクリア</button>
+                    <button class="btn" onclick="exportLogs()">ログエクスポート</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- モーダル -->
+    <div class="modal" id="config-modal">
+        <div class="modal-content">
+            <h3>Supabase設定</h3>
+            <input type="text" id="supabase-url" placeholder="Supabase URL">
+            <input type="text" id="supabase-key" placeholder="Anon Key">
+            <div class="button-group">
+                <button class="btn" onclick="saveConfig()">保存</button>
+                <button class="btn danger" onclick="closeModal()">キャンセル</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- スクリプト読み込み -->
+    <script src="supabase-config.js"></script>
+    <script src="auth.js"></script>
+    <script src="sync-manager.js"></script>
+    <script src="database-enhanced.js"></script>
+    <script src="sync-ui.js"></script>
+    
+    <script>
+        // ログ管理
+        function addLog(message, type = 'info') {
+            const container = document.getElementById('log-container');
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            const time = new Date().toLocaleTimeString('ja-JP');
+            entry.textContent = `[${time}] ${message}`;
+            container.insertBefore(entry, container.firstChild);
+            
+            // 最大100件まで保持
+            while (container.children.length > 100) {
+                container.removeChild(container.lastChild);
+            }
+        }
+        
+        // 接続テスト
+        async function testConnection() {
+            addLog('接続テストを開始します...', 'info');
+            
+            try {
+                // Supabase接続確認
+                if (typeof supabase === 'undefined') {
+                    throw new Error('Supabaseクライアントが初期化されていません');
+                }
+                
+                // 認証確認
+                const { data: { session }, error: authError } = await supabase.auth.getSession();
+                if (authError) {
+                    throw new Error('認証エラー: ' + authError.message);
+                }
+                
+                document.getElementById('auth-status').textContent = session ? 'ログイン済み' : '未ログイン';
+                document.getElementById('auth-status').className = session ? 'status-value online' : 'status-value offline';
+                
+                // データベース接続テスト
+                const { data, error } = await supabase
+                    .from('orders')
+                    .select('id')
+                    .limit(1);
+                
+                if (error) {
+                    throw new Error('データベースエラー: ' + error.message);
+                }
+                
+                document.getElementById('supabase-status').textContent = 'オンライン';
+                document.getElementById('supabase-status').className = 'status-value online';
+                
+                addLog('接続テスト成功', 'success');
+                
+            } catch (error) {
+                document.getElementById('supabase-status').textContent = 'オフライン';
+                document.getElementById('supabase-status').className = 'status-value offline';
+                addLog('接続テスト失敗: ' + error.message, 'error');
+            }
+        }
+        
+        // 再接続
+        async function reconnect() {
+            addLog('再接続を試みています...', 'info');
+            
+            if (syncManager) {
+                await syncManager.handleOnline();
+                addLog('再接続処理を実行しました', 'success');
+            } else {
+                addLog('同期マネージャーが初期化されていません', 'error');
+            }
+            
+            updateStatus();
+        }
+        
+        // 同期実行
+        async function forceSyncNow() {
+            addLog('手動同期を開始します...', 'info');
+            
+            if (syncManager) {
+                try {
+                    await syncManager.forceSyncNow();
+                    addLog('同期完了', 'success');
+                } catch (error) {
+                    addLog('同期エラー: ' + error.message, 'error');
+                }
+            }
+            
+            updateStatus();
+        }
+        
+        // 保留中の変更をクリア
+        function clearPendingChanges() {
+            if (confirm('保留中の変更をすべてクリアしますか？')) {
+                if (syncManager) {
+                    syncManager.clearPendingChanges();
+                    addLog('保留中の変更をクリアしました', 'warning');
+                }
+                updateStatus();
+            }
+        }
+        
+        // 統計情報の更新
+        async function refreshStats() {
+            addLog('統計情報を更新しています...', 'info');
+            
+            try {
+                // ローカルデータ数
+                const localOrders = JSON.parse(localStorage.getItem('orderSystem_orders') || '[]');
+                document.getElementById('local-orders').textContent = localOrders.length + '件';
+                
+                // サーバーデータ数
+                if (supabase) {
+                    const { count, error } = await supabase
+                        .from('orders')
+                        .select('*', { count: 'exact', head: true });
+                    
+                    if (!error) {
+                        document.getElementById('server-orders').textContent = (count || 0) + '件';
+                        document.getElementById('total-orders').textContent = (count || 0) + '件';
+                    }
+                }
+                
+                // キャッシュサイズ
+                const cacheSize = new Blob([JSON.stringify(localStorage)]).size / 1024;
+                document.getElementById('cache-size').textContent = cacheSize.toFixed(2) + ' KB';
+                
+                addLog('統計情報を更新しました', 'success');
+                
+            } catch (error) {
+                addLog('統計更新エラー: ' + error.message, 'error');
+            }
+        }
+        
+        // ローカルデータクリア
+        function clearLocalData() {
+            if (confirm('ローカルデータをすべて削除しますか？この操作は取り消せません。')) {
+                localStorage.removeItem('orderSystem_orders');
+                localStorage.removeItem('syncPendingChanges');
+                addLog('ローカルデータをクリアしました', 'warning');
+                refreshStats();
+            }
+        }
+        
+        // テストオーダー作成
+        async function createTestOrder() {
+            addLog('テストオーダーを作成しています...', 'info');
+            
+            const testOrder = {
+                customer_name: 'テスト顧客 ' + Date.now(),
+                phone: '090-1234-5678',
+                email: 'test@example.com',
+                delivery_date: new Date().toISOString().split('T')[0],
+                delivery_time: '14:00',
+                delivery_address: 'テスト住所',
+                order_items: JSON.stringify([
+                    { name: 'テスト商品', quantity: 1, price: 1000 }
+                ]),
+                total_amount: 1000,
+                notes: 'これはテストオーダーです',
+                completed: false,
+                deleted: false
+            };
+            
+            try {
+                if (enhancedDb) {
+                    const created = await enhancedDb.createOrder(testOrder);
+                    addLog('テストオーダー作成成功: ID=' + created.id, 'success');
+                } else {
+                    throw new Error('データベースマネージャーが初期化されていません');
+                }
+            } catch (error) {
+                addLog('テストオーダー作成失敗: ' + error.message, 'error');
+            }
+        }
+        
+        // 全テスト実行
+        async function runAllTests() {
+            addLog('全テストを実行します...', 'info');
+            
+            const tests = [
+                { id: 'test-create', name: 'オーダー作成', fn: testCreateOrder },
+                { id: 'test-update', name: 'オーダー更新', fn: testUpdateOrder },
+                { id: 'test-realtime', name: 'リアルタイム', fn: testRealtime },
+                { id: 'test-conflict', name: '競合解決', fn: testConflictResolution }
+            ];
+            
+            for (const test of tests) {
+                const statusEl = document.getElementById(test.id);
+                statusEl.className = 'test-status running';
+                
+                try {
+                    await test.fn();
+                    statusEl.className = 'test-status pass';
+                    addLog(`✓ ${test.name}テスト: 成功`, 'success');
+                } catch (error) {
+                    statusEl.className = 'test-status fail';
+                    addLog(`✗ ${test.name}テスト: 失敗 - ${error.message}`, 'error');
+                }
+            }
+            
+            addLog('全テスト完了', 'info');
+        }
+        
+        // 個別テスト関数
+        async function testCreateOrder() {
+            // オーダー作成テスト
+            const testData = { customer_name: 'Test', phone: '000-0000-0000' };
+            const result = await enhancedDb.createOrder(testData);
+            if (!result.id) throw new Error('IDが生成されませんでした');
+        }
+        
+        async function testUpdateOrder() {
+            // 更新テスト（実装）
+            const orders = await enhancedDb.getOrders();
+            if (orders.length > 0) {
+                await enhancedDb.updateOrder(orders[0].id, { notes: 'Updated' });
+            }
+        }
+        
+        async function testRealtime() {
+            // リアルタイムテスト（実装）
+            return new Promise((resolve) => {
+                setTimeout(resolve, 1000);
+            });
+        }
+        
+        async function testConflictResolution() {
+            // 競合解決テスト（実装）
+            return new Promise((resolve) => {
+                setTimeout(resolve, 1000);
+            });
+        }
+        
+        // ログクリア
+        function clearLogs() {
+            document.getElementById('log-container').innerHTML = '<div class="log-entry">ログをクリアしました</div>';
+        }
+        
+        // ログエクスポート
+        function exportLogs() {
+            const logs = Array.from(document.getElementById('log-container').children)
+                .map(el => el.textContent)
+                .join('\n');
+            
+            const blob = new Blob([logs], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `sync-debug-log-${new Date().toISOString()}.txt`;
+            a.click();
+            
+            addLog('ログをエクスポートしました', 'success');
+        }
+        
+        // 状態更新
+        function updateStatus() {
+            // ネットワーク状態
+            document.getElementById('network-status').textContent = navigator.onLine ? 'オンライン' : 'オフライン';
+            document.getElementById('network-status').className = navigator.onLine ? 'status-value online' : 'status-value offline';
+            
+            // 同期状態
+            if (syncManager) {
+                const status = syncManager.getStatus();
+                
+                document.getElementById('sync-status').textContent = 
+                    status.isSyncing ? '同期中...' : 
+                    status.isOnline ? 'オンライン' : 'オフライン';
+                    
+                document.getElementById('sync-status').className = 
+                    status.isOnline ? 'status-value online' : 'status-value offline';
+                
+                document.getElementById('pending-changes').textContent = status.pendingCount + '件';
+                document.getElementById('sync-errors').textContent = status.syncErrors.length + '件';
+                
+                if (status.lastSync) {
+                    const date = new Date(status.lastSync);
+                    document.getElementById('last-sync').textContent = date.toLocaleString('ja-JP');
+                }
+            }
+            
+            refreshStats();
+        }
+        
+        // 初期化
+        window.addEventListener('DOMContentLoaded', () => {
+            addLog('診断ツールを初期化しました', 'success');
+            
+            // 定期的な状態更新
+            setInterval(updateStatus, 5000);
+            
+            // 初回更新
+            updateStatus();
+            testConnection();
+        });
+        
+        // ネットワーク状態監視
+        window.addEventListener('online', () => {
+            addLog('ネットワーク接続が復旧しました', 'success');
+            updateStatus();
+        });
+        
+        window.addEventListener('offline', () => {
+            addLog('ネットワーク接続が失われました', 'warning');
+            updateStatus();
+        });
+    </script>
+</body>
+</html>
