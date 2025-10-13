@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>同期テスト（Replicationなし）</title>
+    
+    <!-- Supabase SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            border-bottom: 2px solid #4CAF50;
+            padding-bottom: 10px;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            background: #e8f5e9;
+        }
+        .status.error {
+            background: #ffebee;
+            color: #c62828;
+        }
+        .status.success {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 16px;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .order-list {
+            margin-top: 20px;
+        }
+        .order-item {
+            padding: 10px;
+            margin: 10px 0;
+            background: #f9f9f9;
+            border-radius: 5px;
+            border-left: 4px solid #4CAF50;
+        }
+        .order-item h3 {
+            margin: 0 0 5px 0;
+            color: #333;
+        }
+        .order-item p {
+            margin: 5px 0;
+            color: #666;
+        }
+        .sync-info {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background: white;
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        .sync-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 5px;
+        }
+        .sync-indicator.online {
+            background: #4CAF50;
+        }
+        .sync-indicator.offline {
+            background: #f44336;
+        }
+        .sync-indicator.syncing {
+            background: #2196F3;
+            animation: pulse 1s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        input, textarea {
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+    </style>
+</head>
+<body>
+    <div class="sync-info">
+        <span class="sync-indicator" id="sync-indicator"></span>
+        <span id="sync-status">初期化中...</span>
+    </div>
+    
+    <div class="container">
+        <h1>🔄 同期テスト（ポーリング方式）</h1>
+        
+        <div class="status" id="connection-status">
+            接続状態を確認中...
+        </div>
+        
+        <div>
+            <h2>テストオーダー作成</h2>
+            <input type="text" id="customer-name" placeholder="顧客名" value="テスト顧客">
+            <input type="text" id="phone" placeholder="電話番号" value="090-1234-5678">
+            <textarea id="notes" placeholder="備考" rows="3">テストオーダー</textarea>
+            
+            <button onclick="createOrder()">オーダー作成</button>
+            <button onclick="loadOrders()">データ更新</button>
+            <button onclick="clearLocal()">ローカルクリア</button>
+            <button onclick="testConnection()">接続テスト</button>
+        </div>
+        
+        <div class="order-list">
+            <h2>オーダー一覧</h2>
+            <div id="orders-container">
+                読み込み中...
+            </div>
+        </div>
+    </div>
+    
+    <!-- Supabase設定 -->
+    <script src="supabase-config.js"></script>
+    
+    <script>
+        let isOnline = false;
+        let syncInterval = null;
+        
+        // 初期化
+        async function init() {
+            console.log('Initializing...');
+            
+            // Supabase接続確認
+            await testConnection();
+            
+            // データ読み込み
+            await loadOrders();
+            
+            // ポーリング開始（3秒ごと）
+            startPolling();
+        }
+        
+        // 接続テスト
+        async function testConnection() {
+            const statusEl = document.getElementById('connection-status');
+            const indicatorEl = document.getElementById('sync-indicator');
+            const syncStatusEl = document.getElementById('sync-status');
+            
+            try {
+                if (!supabase) {
+                    throw new Error('Supabaseが初期化されていません');
+                }
+                
+                // ordersテーブルにアクセス
+                const { data, error } = await supabase
+                    .from('orders')
+                    .select('count')
+                    .limit(1);
+                
+                if (error) throw error;
+                
+                isOnline = true;
+                statusEl.textContent = '✅ Supabaseに接続されています';
+                statusEl.className = 'status success';
+                indicatorEl.className = 'sync-indicator online';
+                syncStatusEl.textContent = 'オンライン';
+                
+            } catch (error) {
+                isOnline = false;
+                statusEl.textContent = '❌ 接続エラー: ' + error.message;
+                statusEl.className = 'status error';
+                indicatorEl.className = 'sync-indicator offline';
+                syncStatusEl.textContent = 'オフライン';
+            }
+        }
+        
+        // ポーリング開始
+        function startPolling() {
+            if (syncInterval) clearInterval(syncInterval);
+            
+            syncInterval = setInterval(async () => {
+                if (isOnline) {
+                    const indicatorEl = document.getElementById('sync-indicator');
+                    const syncStatusEl = document.getElementById('sync-status');
+                    
+                    indicatorEl.className = 'sync-indicator syncing';
+                    syncStatusEl.textContent = '同期中...';
+                    
+                    await syncData();
+                    
+                    indicatorEl.className = 'sync-indicator online';
+                    syncStatusEl.textContent = 'オンライン';
+                }
+            }, 3000);
+        }
+        
+        // データ同期
+        async function syncData() {
+            if (!isOnline) return;
+            
+            try {
+                // サーバーから最新データ取得
+                const { data, error } = await supabase
+                    .from('orders')
+                    .select('*')
+                    .order('created_at', { ascending: false });
+                
+                if (!error && data) {
+                    // ローカルストレージと比較して更新
+                    const localOrders = JSON.parse(localStorage.getItem('test_orders') || '[]');
+                    
+                    // 新しいデータがあるか確認
+                    const hasNewData = data.length !== localOrders.length || 
+                        data.some((serverOrder, index) => {
+                            const localOrder = localOrders[index];
+                            return !localOrder || serverOrder.id !== localOrder.id ||
+                                   new Date(serverOrder.updated_at) > new Date(localOrder.updated_at || 0);
+                        });
+                    
+                    if (hasNewData) {
+                        localStorage.setItem('test_orders', JSON.stringify(data));
+                        displayOrders(data);
+                        console.log('データを同期しました');
+                    }
+                }
+            } catch (error) {
+                console.error('同期エラー:', error);
+            }
+        }
+        
+        // オーダー作成
+        async function createOrder() {
+            const customerName = document.getElementById('customer-name').value;
+            const phone = document.getElementById('phone').value;
+            const notes = document.getElementById('notes').value;
+            
+            const newOrder = {
+                customer_name: customerName,
+                phone: phone,
+                email: 'test@example.com',
+                delivery_date: new Date().toISOString().split('T')[0],
+                delivery_time: '10:00-12:00',
+                delivery_address: 'テスト住所',
+                order_items: JSON.stringify([{name: 'テスト商品', quantity: 1, price: 1000}]),
+                total_amount: 1000,
+                notes: notes,
+                completed: false,
+                deleted: false
+            };
+            
+            if (isOnline) {
+                try {
+                    const { data, error } = await supabase
+                        .from('orders')
+                        .insert([newOrder])
+                        .select();
+                    
+                    if (error) throw error;
+                    
+                    alert('オーダーを作成しました');
+                    await loadOrders();
+                    
+                } catch (error) {
+                    alert('作成エラー: ' + error.message);
+                }
+            } else {
+                // オフライン時はローカルに保存
+                const localOrders = JSON.parse(localStorage.getItem('test_orders') || '[]');
+                newOrder.id = 'local_' + Date.now();
+                newOrder.created_at = new Date().toISOString();
+                localOrders.unshift(newOrder);
+                localStorage.setItem('test_orders', JSON.stringify(localOrders));
+                displayOrders(localOrders);
+                alert('オフラインモード：ローカルに保存しました');
+            }
+        }
+        
+        // オーダー読み込み
+        async function loadOrders() {
+            if (isOnline) {
+                try {
+                    const { data, error } = await supabase
+                        .from('orders')
+                        .select('*')
+                        .order('created_at', { ascending: false });
+                    
+                    if (error) throw error;
+                    
+                    localStorage.setItem('test_orders', JSON.stringify(data));
+                    displayOrders(data);
+                    
+                } catch (error) {
+                    console.error('読み込みエラー:', error);
+                    // エラー時はローカルデータを表示
+                    const localOrders = JSON.parse(localStorage.getItem('test_orders') || '[]');
+                    displayOrders(localOrders);
+                }
+            } else {
+                // オフライン時はローカルデータを表示
+                const localOrders = JSON.parse(localStorage.getItem('test_orders') || '[]');
+                displayOrders(localOrders);
+            }
+        }
+        
+        // オーダー表示
+        function displayOrders(orders) {
+            const container = document.getElementById('orders-container');
+            
+            if (!orders || orders.length === 0) {
+                container.innerHTML = '<p>オーダーがありません</p>';
+                return;
+            }
+            
+            container.innerHTML = orders.map(order => `
+                <div class="order-item">
+                    <h3>${order.customer_name || '名前なし'}</h3>
+                    <p>📞 ${order.phone || '電話番号なし'}</p>
+                    <p>📝 ${order.notes || '備考なし'}</p>
+                    <p>🕐 ${new Date(order.created_at).toLocaleString('ja-JP')}</p>
+                    <p>ID: ${order.id}</p>
+                </div>
+            `).join('');
+        }
+        
+        // ローカルデータクリア
+        function clearLocal() {
+            if (confirm('ローカルデータをクリアしますか？')) {
+                localStorage.removeItem('test_orders');
+                loadOrders();
+                alert('ローカルデータをクリアしました');
+            }
+        }
+        
+        // ページ読み込み時に初期化
+        window.addEventListener('DOMContentLoaded', init);
+        
+        // オンライン/オフライン検知
+        window.addEventListener('online', () => {
+            console.log('オンラインになりました');
+            testConnection();
+        });
+        
+        window.addEventListener('offline', () => {
+            console.log('オフラインになりました');
+            isOnline = false;
+            document.getElementById('sync-indicator').className = 'sync-indicator offline';
+            document.getElementById('sync-status').textContent = 'オフライン';
+        });
+    </script>
+</body>
+</html>
