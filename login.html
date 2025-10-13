@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ログイン - オーダー管理システム</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="style.css">
+    
+    <!-- Supabase SDK（オプション：Supabaseを使用する場合のみ必要） -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
+    <style>
+        .login-container {
+            min-height: 100vh;
+            background: linear-gradient(135deg, #8B9A8C 0%, #A8B5A9 100%);
+        }
+        
+        .login-card {
+            background: white;
+            border-radius: 1rem;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1);
+        }
+        
+        .login-input {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            border: 1px solid #e5e7eb;
+            border-radius: 0.5rem;
+            transition: all 0.3s;
+        }
+        
+        .login-input:focus {
+            outline: none;
+            border-color: #8B9A8C;
+            box-shadow: 0 0 0 3px rgba(139, 154, 140, 0.1);
+        }
+        
+        .mode-indicator {
+            position: fixed;
+            bottom: 1rem;
+            right: 1rem;
+            padding: 0.5rem 1rem;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            border-radius: 0.5rem;
+            font-size: 0.875rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container flex items-center justify-center p-4">
+        <div class="login-card w-full max-w-md p-8">
+            <!-- ロゴ・タイトル -->
+            <div class="text-center mb-8">
+                <div class="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-sage to-sage-light rounded-full mb-4">
+                    <i class="fas fa-leaf text-white text-3xl"></i>
+                </div>
+                <h1 class="text-2xl font-bold text-gray-800">オーダー管理システム</h1>
+                <p class="text-gray-600 mt-2">ログインしてください</p>
+            </div>
+            
+            <!-- エラーメッセージ表示エリア -->
+            <div id="error-message" class="hidden bg-red-50 text-red-600 p-3 rounded-lg mb-4">
+                <i class="fas fa-exclamation-circle mr-2"></i>
+                <span id="error-text"></span>
+            </div>
+            
+            <!-- 成功メッセージ表示エリア -->
+            <div id="success-message" class="hidden bg-green-50 text-green-600 p-3 rounded-lg mb-4">
+                <i class="fas fa-check-circle mr-2"></i>
+                <span id="success-text"></span>
+            </div>
+            
+            <!-- ログインフォーム -->
+            <form id="login-form" onsubmit="handleLogin(event)">
+                <div class="mb-4">
+                    <label class="block text-gray-700 text-sm font-medium mb-2">
+                        メールアドレス
+                    </label>
+                    <input type="email" id="email" class="login-input" 
+                           placeholder="your@email.com" required>
+                </div>
+                
+                <div class="mb-6">
+                    <label class="block text-gray-700 text-sm font-medium mb-2">
+                        パスワード
+                    </label>
+                    <input type="password" id="password" class="login-input" 
+                           placeholder="••••••••" required>
+                    <p class="text-xs text-gray-500 mt-1">
+                        ※ オフラインモードの場合は "demo123" を入力
+                    </p>
+                </div>
+                
+                <button type="submit" class="w-full btn-primary mb-4">
+                    <i class="fas fa-sign-in-alt mr-2"></i>
+                    ログイン
+                </button>
+            </form>
+            
+            <!-- その他のアクション -->
+            <div class="text-center">
+                <button onclick="showSignupForm()" class="text-sage hover:text-sage-dark text-sm">
+                    新規アカウント作成
+                </button>
+                <span class="mx-2 text-gray-400">|</span>
+                <button onclick="showPasswordReset()" class="text-sage hover:text-sage-dark text-sm">
+                    パスワードを忘れた方
+                </button>
+            </div>
+            
+            <!-- サインアップフォーム（初期非表示） -->
+            <form id="signup-form" class="hidden mt-6 pt-6 border-t" onsubmit="handleSignup(event)">
+                <h3 class="text-lg font-semibold mb-4">新規アカウント作成</h3>
+                <div class="mb-4">
+                    <input type="email" id="signup-email" class="login-input" 
+                           placeholder="メールアドレス" required>
+                </div>
+                <div class="mb-4">
+                    <input type="password" id="signup-password" class="login-input" 
+                           placeholder="パスワード（8文字以上）" minlength="8" required>
+                </div>
+                <div class="mb-4">
+                    <input type="text" id="signup-name" class="login-input" 
+                           placeholder="お名前" required>
+                </div>
+                <button type="submit" class="w-full btn-primary mb-2">
+                    アカウント作成
+                </button>
+                <button type="button" onclick="hideSignupForm()" class="w-full btn-secondary">
+                    キャンセル
+                </button>
+            </form>
+        </div>
+    </div>
+    
+    <!-- モードインジケーター -->
+    <div id="mode-indicator" class="mode-indicator">
+        <i class="fas fa-circle mr-2"></i>
+        <span id="mode-text">接続確認中...</span>
+    </div>
+    
+    <!-- Scripts -->
+    <script src="supabase-config.js"></script>
+    <script src="auth.js"></script>
+    <script>
+        // ページロード時の処理
+        window.addEventListener('DOMContentLoaded', async () => {
+            console.log('Login page: Starting initialization');
+            
+            try {
+                // 認証マネージャーの初期化を待つ
+                const auth = await getAuthManager();
+                console.log('Login page: AuthManager obtained', auth);
+                
+                // モード表示
+                updateModeIndicator();
+                
+                // 既にログイン済みの場合はメイン画面へ
+                if (auth) {
+                    const user = auth.getUser();
+                    console.log('Login page: Current user', user);
+                    
+                    if (user) {
+                        console.log('Login page: User already authenticated, redirecting to main page');
+                        window.location.href = 'index.html';
+                    }
+                }
+            } catch (error) {
+                console.error('Login page: Initialization failed', error);
+                // エラー時はログインページを表示継続
+                updateModeIndicator();
+            }
+        });
+
+        // 認証マネージャーの初期化を待機（使用されていないため削除予定）
+        async function waitForAuthManager() {
+            console.warn('waitForAuthManager is deprecated, use getAuthManager() directly');
+            return await getAuthManager();
+        }
+        
+        // モードインジケーター更新
+        function updateModeIndicator() {
+            const indicator = document.getElementById('mode-indicator');
+            const modeText = document.getElementById('mode-text');
+            const icon = indicator.querySelector('i');
+            
+            if (typeof supabase !== 'undefined' && supabase) {
+                icon.className = 'fas fa-circle mr-2 text-green-400';
+                modeText.textContent = 'オンラインモード';
+            } else {
+                icon.className = 'fas fa-circle mr-2 text-yellow-400';
+                modeText.textContent = 'オフラインモード（LocalStorage）';
+            }
+        }
+        
+        // ログイン処理
+        async function handleLogin(event) {
+            event.preventDefault();
+            
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            
+            showMessage('info', 'ログイン中...');
+            
+            try {
+                const auth = await getAuthManager();
+                if (!auth) {
+                    throw new Error('認証マネージャーが初期化されていません');
+                }
+                
+                console.log('Login: Attempting login for', email);
+                const result = await auth.login(email, password);
+                console.log('Login: Result', result);
+                
+                if (result.success) {
+                    showMessage('success', 'ログインに成功しました');
+                    console.log('Login: Success, user:', result.user);
+                    
+                    // 認証状態が確実に保存されるまで少し待つ
+                    setTimeout(() => {
+                        console.log('Login: Redirecting to main page');
+                        window.location.href = 'index.html';
+                    }, 1500); // 1.5秒待機
+                } else {
+                    console.error('Login: Failed', result.error);
+                    showMessage('error', result.error || 'ログインに失敗しました');
+                }
+            } catch (error) {
+                console.error('Login handler error:', error);
+                showMessage('error', 'ログイン処理でエラーが発生しました: ' + error.message);
+            }
+        }
+        
+        // サインアップフォーム表示
+        function showSignupForm() {
+            document.getElementById('login-form').classList.add('hidden');
+            document.getElementById('signup-form').classList.remove('hidden');
+            clearMessages();
+        }
+        
+        // サインアップフォーム非表示
+        function hideSignupForm() {
+            document.getElementById('signup-form').classList.add('hidden');
+            document.getElementById('login-form').classList.remove('hidden');
+            clearMessages();
+        }
+        
+        // サインアップ処理
+        async function handleSignup(event) {
+            event.preventDefault();
+            
+            const email = document.getElementById('signup-email').value;
+            const password = document.getElementById('signup-password').value;
+            const name = document.getElementById('signup-name').value;
+            
+            showMessage('info', 'アカウント作成中...');
+            
+            try {
+                const auth = await getAuthManager();
+                if (!auth) {
+                    throw new Error('認証マネージャーが初期化されていません');
+                }
+                
+                console.log('Signup: Attempting signup for', email);
+                const result = await auth.signup(email, password, { name: name });
+                console.log('Signup: Result', result);
+                
+                if (result.success) {
+                    showMessage('success', result.message || 'アカウントを作成しました');
+                    hideSignupForm();
+                } else {
+                    console.error('Signup: Failed', result.error);
+                    showMessage('error', result.error || 'アカウント作成に失敗しました');
+                }
+            } catch (error) {
+                console.error('Signup handler error:', error);
+                showMessage('error', 'アカウント作成処理でエラーが発生しました: ' + error.message);
+            }
+        }
+        
+        // パスワードリセット
+        async function showPasswordReset() {
+            const email = prompt('パスワードリセット用のメールアドレスを入力してください：');
+            if (email) {
+                const result = await authManager.resetPassword(email);
+                if (result.success) {
+                    showMessage('success', result.message);
+                } else {
+                    showMessage('error', result.error);
+                }
+            }
+        }
+        
+        // メッセージ表示
+        function showMessage(type, message) {
+            clearMessages();
+            
+            if (type === 'error') {
+                const errorDiv = document.getElementById('error-message');
+                document.getElementById('error-text').textContent = message;
+                errorDiv.classList.remove('hidden');
+            } else if (type === 'success') {
+                const successDiv = document.getElementById('success-message');
+                document.getElementById('success-text').textContent = message;
+                successDiv.classList.remove('hidden');
+            }
+        }
+        
+        // メッセージクリア
+        function clearMessages() {
+            document.getElementById('error-message').classList.add('hidden');
+            document.getElementById('success-message').classList.add('hidden');
+        }
+    </script>
+</body>
+</html>

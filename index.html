@@ -1,0 +1,796 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>オーダーシート ver.0.9</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css">
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Supabase SDK（オプション：Supabaseを使用する場合のみ必要） -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        sage: '#8B9A8C',
+                        'sage-light': '#A8B5A9',
+                        'sage-dark': '#6B7A6C',
+                        cream: '#F7F5F3',
+                        'cream-dark': '#F0EDE8',
+                        terracotta: '#D4A574',
+                        'terracotta-light': '#E2C4A0',
+                        forest: '#2D3E2F'
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="bg-cream">
+    
+    <!-- ホワイトアウトオーバーレイ -->
+    <div id="whiteout-overlay" class="whiteout-overlay"></div>
+    
+    <!-- メインコンテナ -->
+    <div id="app" class="min-h-screen pb-20">
+        
+        <!-- ヘッダー -->
+        <header class="sticky top-0 bg-white shadow-sm z-40 border-b border-sage-light">
+            <div class="header-container">
+                <!-- モバイル用レイアウト -->
+                <div class="header-mobile">
+                    <!-- 上段：タイトルとログイン情報 -->
+                    <div class="header-top-row">
+                        <h1 class="header-title">
+                            <i class="fas fa-leaf text-sage"></i>
+                            オーダーシート ver.0.9
+                        </h1>
+                        <div class="header-user-info">
+                            <div id="auth-status" class="auth-status-text"></div>
+                            <div class="header-action-buttons">
+                                <button onclick="app.syncData()" class="header-icon-btn" title="データ同期">
+                                    <i class="fas fa-sync-alt"></i>
+                                </button>
+                                <button onclick="authManager.logout()" class="header-icon-btn logout-btn" title="ログアウト">
+                                    <i class="fas fa-sign-out-alt"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- 下段：アクションボタン -->
+                    <div class="header-actions">
+                        <button id="input-btn" onclick="app.openNewOrderForm()" class="input-header-btn">
+                            <i class="fas fa-plus-circle mr-1 animate-pulse"></i>受注入力
+                        </button>
+                        <button id="incomplete-count-btn" onclick="app.showIncompleteTab()" class="incomplete-header-btn">
+                            <i class="fas fa-exclamation-circle mr-1"></i>
+                            未完了 <span id="incomplete-count-text">0</span>件
+                        </button>
+                    </div>
+                </div>
+
+                <!-- デスクトップ用レイアウト（641px以上） -->
+                <div class="header-desktop">
+                    <div class="flex items-center gap-3">
+                        <h1 class="text-xl font-bold text-forest flex items-center gap-2">
+                            <i class="fas fa-leaf text-sage"></i>
+                            オーダーシート ver.0.9
+                        </h1>
+                        <div class="flex gap-2">
+                            <button id="input-btn-desktop" onclick="app.openNewOrderForm()" class="input-header-btn">
+                                <i class="fas fa-plus-circle mr-1 animate-pulse"></i>受注入力
+                            </button>
+                            <button id="incomplete-count-btn-desktop" onclick="app.showIncompleteTab()" class="incomplete-header-btn">
+                                <i class="fas fa-exclamation-circle mr-1"></i>
+                                未完了 <span class="incomplete-count-text">0</span>件
+                            </button>
+                        </div>
+                    </div>
+                    <div class="flex flex-col items-end gap-1">
+                        <div class="header-action-buttons">
+                            <button onclick="app.syncData()" class="p-2 text-sage hover:text-sage-dark transition" title="データ同期">
+                                <i class="fas fa-sync-alt"></i>
+                            </button>
+                            <button onclick="authManager.logout()" class="p-2 text-red-500 hover:text-red-600 transition" title="ログアウト">
+                                <i class="fas fa-sign-out-alt"></i>
+                            </button>
+                        </div>
+                        <div class="auth-status-text-desktop"></div>
+                    </div>
+                </div>
+            </div>
+        </header>
+        
+        <!-- タブナビゲーション -->
+        <nav class="bg-white border-b border-sage-light sticky top-14 z-30">
+            <div class="container mx-auto px-4">
+                <div class="flex overflow-x-auto scrollbar-hide">
+                    <button class="tab-btn today-tab active" data-tab="today">
+                        <i class="fas fa-calendar-day mr-1"></i>本日 <span id="today-count" class="badge">0</span>
+                    </button>
+                    <button class="tab-btn" data-tab="dryflower">
+                        <i class="fas fa-flower mr-1"></i>ドライフラワー
+                    </button>
+                    <button class="tab-btn" data-tab="plant">
+                        <i class="fas fa-seedling mr-1"></i>植物
+                    </button>
+                    <button class="tab-btn" data-tab="all">
+                        <i class="fas fa-list mr-1"></i>全オーダー
+                    </button>
+                    <button class="tab-btn" data-tab="search">
+                        <i class="fas fa-search mr-1"></i>検索
+                    </button>
+                    <button class="tab-btn" data-tab="completed">
+                        <i class="fas fa-check-circle mr-1"></i>完了済み
+                    </button>
+                </div>
+            </div>
+        </nav>
+        
+        <!-- メインコンテンツ -->
+        <main class="container mx-auto px-4 py-6">
+            
+            <!-- 受注入力タブ -->
+            <div id="tab-input" class="tab-content">
+                <form id="order-form" class="space-y-6">
+                    
+                    <!-- ステップ1: 受注情報 -->
+                    <div class="step-section active" id="step-1">
+                        <h2 class="section-title">
+                            <i class="fas fa-info-circle text-sage mr-2"></i>
+                            受注情報
+                        </h2>
+                        
+                        <!-- 連絡期日アラート -->
+                        <div id="contact-deadline-alert" class="hidden bg-orange-50 border-l-4 border-orange-400 p-3 mb-4 rounded-r">
+                            <div class="flex items-start">
+                                <i class="fas fa-bell text-orange-600 mr-2 mt-1"></i>
+                                <div class="flex-1">
+                                    <p class="text-sm font-medium text-orange-900" id="contact-deadline-message"></p>
+                                    <p class="text-xs text-orange-700 mt-1" id="contact-deadline-details"></p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="bg-white rounded-lg shadow-sm p-4 space-y-4">
+                            <!-- 受注日 -->
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="input-label">受注日 <span class="text-red-500">*</span></label>
+                                    <input type="date" id="reception-date" class="input-field" required>
+                                </div>
+                                <div>
+                                    <label class="input-label">担当者</label>
+                                    <select id="staff" class="input-field">
+                                        <option value="">選択してください</option>
+                                        <option value="市山">市山</option>
+                                        <option value="五十嵐">五十嵐</option>
+                                        <option value="藤田">藤田</option>
+                                        <option value="和佐田">和佐田</option>
+                                        <option value="市山優">市山優</option>
+                                        <option value="梅本">梅本</option>
+                                        <option value="中山">中山</option>
+                                        <option value="藤井">藤井</option>
+                                        <option value="ゲスト">ゲスト</option>
+                                    </select>
+                                    <input type="text" id="staff-other" class="input-field mt-2 hidden" placeholder="ゲスト名を入力">
+                                </div>
+                            </div>
+                            
+                            <!-- サービス内容 -->
+                            <div>
+                                <label class="input-label">サービス内容 <span class="text-red-500">*</span></label>
+                                <div class="grid grid-cols-2 gap-2">
+                                    <label class="radio-label">
+                                        <input type="radio" name="service" value="pickup" class="mr-2" onchange="app.updateServiceOptions()" required>
+                                        <i class="fas fa-store mr-1 text-sage"></i>お引き取り
+                                    </label>
+                                    <label class="radio-label">
+                                        <input type="radio" name="service" value="delivery" class="mr-2" onchange="app.updateServiceOptions()">
+                                        <i class="fas fa-truck mr-1 text-terracotta"></i>配送
+                                    </label>
+                                    <label class="radio-label">
+                                        <input type="radio" name="service" value="shipping" class="mr-2" onchange="app.updateServiceOptions()">
+                                        <i class="fas fa-box mr-1 text-sage-dark"></i>発送
+                                    </label>
+                                    <label class="radio-label">
+                                        <input type="radio" name="service" value="construction" class="mr-2" onchange="app.updateServiceOptions()">
+                                        <i class="fas fa-hard-hat mr-1 text-forest"></i>出張施工
+                                    </label>
+                                </div>
+                            </div>
+                            
+                            <!-- 日時 -->
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="input-label" id="date-label">お引き取り日</label>
+                                    <div class="flex gap-2">
+                                        <input type="date" id="date-from" class="input-field flex-1">
+                                        <span class="self-center">〜</span>
+                                        <input type="date" id="date-to" class="input-field flex-1">
+                                    </div>
+                                    <label class="checkbox-label mt-2">
+                                        <input type="checkbox" id="date-undecided" class="mr-2">
+                                        日付指定なし
+                                    </label>
+                                </div>
+                                <div>
+                                    <label class="input-label" id="time-label">ご来店時間</label>
+                                    <div class="flex gap-2">
+                                        <input type="time" id="time-from" class="input-field flex-1">
+                                        <span class="self-center">〜</span>
+                                        <input type="time" id="time-to" class="input-field flex-1">
+                                    </div>
+                                    <label class="checkbox-label mt-2">
+                                        <input type="checkbox" id="time-undecided" class="mr-2">
+                                        時間指定なし
+                                    </label>
+                                </div>
+                            </div>
+                            
+                            <!-- 発送日（発送選択時のみ表示） -->
+                            <div id="shipping-date-section" class="hidden">
+                                <label class="input-label">発送日</label>
+                                <input type="date" id="shipping-date" class="input-field">
+                                <p class="text-sm text-gray-500 mt-1">※ 開始日のみの入力でもOK</p>
+                            </div>
+                            
+                            <button type="button" onclick="app.nextStep(1)" class="btn-primary next-btn">
+                                次へ <i class="fas fa-arrow-right ml-2"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- ステップ2: ご依頼主・お届け先情報 -->
+                    <div class="step-section" id="step-2">
+                        <h2 class="section-title">
+                            <i class="fas fa-user text-sage mr-2"></i>
+                            ご依頼主・お届け先情報
+                        </h2>
+                        <div class="bg-white rounded-lg shadow-sm p-4 space-y-4">
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="input-label">ご依頼主様 <span class="text-red-500">*</span></label>
+                                    <input type="text" id="customer-name" class="input-field" placeholder="山田 太郎" required>
+                                </div>
+                                <div>
+                                    <label class="input-label">電話番号 <span class="text-red-500">*</span></label>
+                                    <input type="tel" id="customer-phone" class="input-field" placeholder="090-1234-5678" required>
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <label class="input-label">ご住所</label>
+                                <input type="text" id="customer-address" class="input-field" placeholder="東京都渋谷区...">
+                            </div>
+                            
+                            <!-- お届け先（配送・発送時のみ） -->
+                            <div id="delivery-section" class="hidden space-y-4 pt-4 border-t">
+                                <h3 class="font-bold text-sage-dark">お届け先情報</h3>
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="input-label">お届け先様</label>
+                                        <input type="text" id="delivery-name" class="input-field">
+                                    </div>
+                                    <div>
+                                        <label class="input-label">電話番号</label>
+                                        <input type="tel" id="delivery-phone" class="input-field">
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="input-label">お届け先住所</label>
+                                    <input type="text" id="delivery-address" class="input-field">
+                                </div>
+                            </div>
+                            
+                            <button type="button" onclick="app.nextStep(2)" class="btn-primary next-btn">
+                                次へ <i class="fas fa-arrow-right ml-2"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- ステップ3: 商品を追加 -->
+                    <div class="step-section" id="step-3">
+                        <h2 class="section-title">
+                            <i class="fas fa-shopping-cart text-sage mr-2"></i>
+                            商品を追加
+                        </h2>
+                        <div class="bg-white rounded-lg shadow-sm p-4">
+                            
+                            <!-- 商品カテゴリ選択 -->
+                            <div class="grid grid-cols-3 gap-3 mb-4">
+                                <button type="button" onclick="app.showProductForm('dryflower')" class="category-btn bg-gradient-to-br from-terracotta to-terracotta-light">
+                                    <i class="fas fa-spa text-3xl mb-2"></i>
+                                    <span>ドライフラワー</span>
+                                </button>
+                                <button type="button" onclick="app.showProductForm('plant')" class="category-btn bg-gradient-to-br from-sage to-sage-light">
+                                    <i class="fas fa-leaf text-3xl mb-2"></i>
+                                    <span>観葉植物</span>
+                                </button>
+                                <button type="button" onclick="app.showProductForm('tree')" class="category-btn bg-gradient-to-br from-forest to-sage-dark">
+                                    <i class="fas fa-tree text-3xl mb-2"></i>
+                                    <span>植木</span>
+                                </button>
+                            </div>
+                            
+                            <!-- 商品追加フォーム（動的表示） -->
+                            <div id="product-form-container" class="hidden">
+                                <!-- JavaScriptで動的に生成 -->
+                            </div>
+                            
+                            <!-- 追加済み商品リスト -->
+                            <div id="added-products" class="space-y-3 mt-6">
+                                <!-- JavaScriptで動的に生成 -->
+                            </div>
+                            
+                            <!-- 送料 -->
+                            <div id="shipping-cost-section" class="mt-4 pt-4 border-t hidden">
+                                <div class="flex justify-between items-center">
+                                    <label class="font-medium text-sage-dark">
+                                        <i class="fas fa-truck mr-2"></i>送料
+                                    </label>
+                                    <div class="flex items-center gap-2">
+                                        <input type="number" id="shipping-cost" class="input-field w-32" value="0" min="0" step="10">
+                                        <span class="text-gray-600">円</span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- 商品備考 -->
+                            <div class="mt-4 pt-4 border-t">
+                                <label class="input-label">
+                                    <i class="fas fa-sticky-note mr-2 text-sage"></i>商品備考（連絡期日や特記事項）
+                                </label>
+                                <textarea id="product-notes" class="input-field" rows="3" placeholder="連絡期日、特記事項、配送上の注意事項など"></textarea>
+                                <p class="text-xs text-gray-500 mt-1">※ この欄は商品に関する備考です。全体の備考は次のステップで入力できます。</p>
+                            </div>
+                            
+                            <div class="mt-4 pt-4 border-t">
+                                <button type="button" onclick="app.nextStep(3)" class="btn-primary next-btn">
+                                    次へ <i class="fas fa-arrow-right ml-2"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- ステップ4: 備考・合計 -->
+                    <div class="step-section" id="step-4">
+                        <h2 class="section-title">
+                            <i class="fas fa-calculator text-sage mr-2"></i>
+                            備考・合計
+                        </h2>
+                        <div class="bg-white rounded-lg shadow-sm p-4 space-y-4">
+                            
+                            <!-- ディスカウント -->
+                            <div>
+                                <label class="flex items-center mb-2">
+                                    <input type="checkbox" id="discount-check" class="mr-2" onchange="app.toggleDiscountField()">
+                                    <span class="input-label mb-0">ディスカウントあり</span>
+                                </label>
+                                <div id="discount-field" class="hidden">
+                                    <div class="flex gap-2">
+                                        <input type="number" id="discount" class="input-field flex-1" placeholder="0" min="0" step="10" oninput="app.updateTotal()">
+                                        <span class="flex items-center text-gray-600">円</span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- 備考 -->
+                            <div>
+                                <label class="flex items-center mb-2">
+                                    <input type="checkbox" id="notes-check" class="mr-2" onchange="app.toggleNotesField()">
+                                    <span class="input-label mb-0">備考あり</span>
+                                </label>
+                                <div id="notes-field" class="hidden">
+                                    <textarea id="notes" class="input-field" rows="3" placeholder="特記事項を入力"></textarea>
+                                </div>
+                            </div>
+            
+                            <!-- 合計表示 -->
+                            <div class="bg-cream rounded-lg p-4">
+                                <h3 class="font-bold text-sage-dark mb-3">明細</h3>
+                                <div id="order-summary" class="space-y-2 text-sm">
+                                    <!-- JavaScriptで動的に生成 -->
+                                </div>
+                            </div>
+                            
+                            <!-- 支払い情報 -->
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div>
+                                    <label class="input-label">お支払い</label>
+                                    <select id="payment-status" class="input-field">
+                                        <option value="未">未</option>
+                                        <option value="済">済</option>
+                                    </select>
+                                </div>
+                                <div id="payment-date-container">
+                                    <label class="input-label">支払い日</label>
+                                    <input type="date" id="payment-date" class="input-field" disabled>
+                                </div>
+                                <div id="payment-staff-container">
+                                    <label class="input-label">担当者</label>
+                                    <select id="payment-staff" class="input-field" disabled>
+                                        <option value="">選択</option>
+                                        <option value="市山">市山</option>
+                                        <option value="五十嵐">五十嵐</option>
+                                        <option value="藤田">藤田</option>
+                                        <option value="和佐田">和佐田</option>
+                                        <option value="市山優">市山優</option>
+                                        <option value="梅本">梅本</option>
+                                        <option value="中山">中山</option>
+                                        <option value="藤井">藤井</option>
+                                        <option value="ゲスト">ゲスト</option>
+                                    </select>
+                                    <input type="text" id="payment-staff-other" class="input-field mt-2 hidden" placeholder="ゲスト名を入力" disabled>
+                                </div>
+                            </div>
+
+                            <!-- 着手情報（編集時のみ表示） -->
+                            <div id="work-section" class="hidden">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="work-started" class="mr-2">
+                                    着手済みにする
+                                </label>
+                                <div id="work-details" class="hidden mt-3 space-y-4">
+                                    <div class="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label class="input-label">担当者選択</label>
+                                            <select id="work-staff" class="input-field">
+                                                <option value="">選択</option>
+                                                <option value="市山">市山</option>
+                                                <option value="五十嵐">五十嵐</option>
+                                                <option value="藤田">藤田</option>
+                                                <option value="和佐田">和佐田</option>
+                                                <option value="市山優">市山優</option>
+                                                <option value="梅本">梅本</option>
+                                                <option value="中山">中山</option>
+                                                <option value="藤井">藤井</option>
+                                                <option value="ゲスト">ゲスト</option>
+                                            </select>
+                                            <input type="text" id="work-staff-other" class="input-field mt-2 hidden" placeholder="ゲスト名を入力">
+                                        </div>
+                                        <div>
+                                            <label class="input-label">着手日時</label>
+                                            <input type="datetime-local" id="work-datetime" class="input-field" readonly>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- 作業状態 -->
+                                    <div>
+                                        <label class="input-label">作業状態</label>
+                                        <select id="work-status" class="input-field">
+                                            <option value="">選択してください</option>
+                                            <option value="材料集め済">材料集め済</option>
+                                            <option value="制作中">制作中</option>
+                                            <option value="制作済">制作済</option>
+                                            <option value="ラッピング済">ラッピング済</option>
+                                            <option value="梱包済">梱包済</option>
+                                            <option value="準備完了">準備完了</option>
+                                        </select>
+                                        
+                                        <!-- 初回決定ボタン -->
+                                        <button type="button" id="confirm-work-status-btn" class="btn-primary btn-small mt-2 hidden" onclick="app.confirmWorkStatus()">
+                                            <i class="fas fa-check mr-1"></i>作業状態を決定
+                                        </button>
+                                        
+                                        <!-- 作業状態履歴 -->
+                                        <div id="work-status-history" class="mt-2 space-y-1 text-sm text-gray-600"></div>
+                                        <button type="button" id="add-work-status-btn" class="btn-secondary btn-small mt-2 hidden" onclick="app.addWorkStatus()">
+                                            <i class="fas fa-plus mr-1"></i>作業状態を追加
+                                        </button>
+                                    </div>
+                                    
+                                    <!-- 連絡記録 -->
+                                    <div>
+                                        <label class="input-label">連絡記録</label>
+                                        <div class="grid grid-cols-2 gap-2">
+                                            <select id="contact-record" class="input-field">
+                                                <option value="">選択してください</option>
+                                                <option value="電話連絡済">電話連絡済</option>
+                                                <option value="不在(留守電)">不在(留守電)</option>
+                                                <option value="不在(留守電なし)">不在(留守電なし)</option>
+                                                <option value="メール済">メール済</option>
+                                                <option value="DM済">DM済</option>
+                                            </select>
+                                            <select id="contact-record-staff" class="input-field">
+                                                <option value="">担当者選択</option>
+                                                <option value="市山">市山</option>
+                                                <option value="五十嵐">五十嵐</option>
+                                                <option value="藤田">藤田</option>
+                                                <option value="和佐田">和佐田</option>
+                                                <option value="市山優">市山優</option>
+                                                <option value="梅本">梅本</option>
+                                                <option value="中山">中山</option>
+                                                <option value="藤井">藤井</option>
+                                                <option value="ゲスト">ゲスト</option>
+                                            </select>
+                                        </div>
+                                        <input type="text" id="contact-record-staff-other" class="input-field mt-2 hidden" placeholder="ゲスト名を入力">
+                                        
+                                        <!-- 初回決定ボタン -->
+                                        <button type="button" id="confirm-contact-record-btn" class="btn-primary btn-small mt-2 hidden" onclick="app.confirmContactRecord()">
+                                            <i class="fas fa-check mr-1"></i>連絡記録を決定
+                                        </button>
+                                        
+                                        <!-- 連絡記録履歴 -->
+                                        <div id="contact-record-history" class="mt-2 space-y-1 text-sm text-gray-600"></div>
+                                        <button type="button" id="add-contact-record-btn" class="btn-secondary btn-small mt-2 hidden" onclick="app.addContactRecord()">
+                                            <i class="fas fa-plus mr-1"></i>連絡記録を追加
+                                        </button>
+                                    </div>
+                                    
+                                    <!-- 完了チェックボックス -->
+                                    <div id="completed-section" class="mt-4 pt-4 border-t">
+                                        <label class="checkbox-label">
+                                            <input type="checkbox" id="completed" class="mr-2">
+                                            このオーダーを完了としてマークする
+                                        </label>
+                                        <div id="completed-details" class="hidden mt-3 grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label class="input-label">完了担当者</label>
+                                                <select id="completed-staff" class="input-field">
+                                                    <option value="">選択</option>
+                                                    <option value="市山">市山</option>
+                                                    <option value="五十嵐">五十嵐</option>
+                                                    <option value="藤田">藤田</option>
+                                                    <option value="和佐田">和佐田</option>
+                                                    <option value="市山優">市山優</option>
+                                                    <option value="梅本">梅本</option>
+                                                    <option value="中山">中山</option>
+                                                    <option value="藤井">藤井</option>
+                                                    <option value="ゲスト">ゲスト</option>
+                                                </select>
+                                                <input type="text" id="completed-staff-other" class="input-field mt-2 hidden" placeholder="ゲスト名を入力">
+                                            </div>
+                                            <div>
+                                                <label class="input-label">完了日時</label>
+                                                <input type="datetime-local" id="completed-datetime" class="input-field" readonly>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- 保存・キャンセルボタン -->
+                            <div class="flex gap-3">
+                                <button type="button" onclick="app.clearForm()" class="btn-secondary flex-1">
+                                    <i class="fas fa-times mr-2"></i>キャンセル
+                                </button>
+                                <button type="submit" id="save-button" class="btn-primary flex-1 hidden">
+                                    <i class="fas fa-save mr-2"></i>保存
+                                </button>
+                            </div>
+                            
+                            <!-- 削除ボタン（編集時のみ表示） -->
+                            <div id="delete-section" class="hidden mt-8 pt-8 border-t border-gray-200">
+                                <!-- 初期表示：小さな削除ボタン -->
+                                <div id="delete-initial" class="text-center">
+                                    <label class="inline-flex items-center cursor-pointer group">
+                                        <input type="checkbox" id="delete-check" class="mr-2" onchange="app.toggleDeleteConfirm()">
+                                        <span class="text-sm text-gray-500 group-hover:text-red-600 transition">
+                                            このオーダーを削除する
+                                        </span>
+                                    </label>
+                                </div>
+                                
+                                <!-- チェック後表示：警告と大きなボタン -->
+                                <div id="delete-confirm" class="hidden bg-red-50 border border-red-200 rounded-lg p-4 mt-4 animate-pulse-once">
+                                    <h3 class="text-red-800 font-bold mb-2">
+                                        <i class="fas fa-exclamation-triangle mr-2"></i>危険な操作
+                                    </h3>
+                                    <p class="text-sm text-red-700 mb-4">
+                                        このオーダーを完全に削除します。この操作は取り消せません。
+                                    </p>
+                                    <button type="button" onclick="app.confirmDelete()" class="btn-danger w-full">
+                                        <i class="fas fa-trash-alt mr-2"></i>このオーダーを完全に削除する
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                </form>
+            </div>
+            
+            <!-- その他のタブ -->
+            <!-- 本日タブ -->
+            <div id="tab-today" class="tab-content">
+                <div class="bg-yellow-50 border-l-4 border-yellow-400 p-3 mb-4 rounded-r">
+                    <div class="flex items-center">
+                        <i class="fas fa-calendar-day text-yellow-600 mr-2"></i>
+                        <div>
+                            <p class="font-bold text-gray-900" id="today-date"></p>
+                            <p class="text-sm text-gray-600">本日のお引き取り・配送希望・発送・施工予定</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="order-list" id="today-orders">
+                    <!-- JavaScriptで動的に生成 -->
+                </div>
+            </div>
+            
+            <div id="tab-dryflower" class="tab-content">
+                <!-- フィルターボタン -->
+                <div class="bg-white rounded-lg shadow-sm p-3 mb-4">
+                    <div class="flex flex-wrap gap-2" id="dryflower-filters">
+                        <button class="filter-btn active" data-filter="all">
+                            <i class="fas fa-list mr-1"></i>全て <span class="filter-count"></span>
+                        </button>
+                        <button class="filter-btn" data-filter="pickup">
+                            <i class="fas fa-clock mr-1"></i>引取待ち <span class="filter-count"></span>
+                        </button>
+                        <button class="filter-btn" data-filter="production">
+                            <i class="fas fa-hammer mr-1"></i>制作未 <span class="filter-count"></span>
+                        </button>
+                        <button class="filter-btn" data-filter="prepare">
+                            <i class="fas fa-box mr-1"></i>準備未 <span class="filter-count"></span>
+                        </button>
+                    </div>
+                </div>
+                <div class="order-list" id="dryflower-orders">
+                    <!-- JavaScriptで動的に生成 -->
+                </div>
+            </div>
+            
+            <div id="tab-plant" class="tab-content">
+                <!-- フィルターボタン -->
+                <div class="bg-white rounded-lg shadow-sm p-3 mb-4">
+                    <div class="flex flex-wrap gap-2" id="plant-filters">
+                        <button class="filter-btn active" data-filter="all">
+                            <i class="fas fa-list mr-1"></i>全て <span class="filter-count"></span>
+                        </button>
+                        <button class="filter-btn" data-filter="pickup">
+                            <i class="fas fa-clock mr-1"></i>引取待ち <span class="filter-count"></span>
+                        </button>
+                        <button class="filter-btn" data-filter="work">
+                            <i class="fas fa-hands mr-1"></i>植替未 <span class="filter-count"></span>
+                        </button>
+                        <button class="filter-btn" data-filter="prepare">
+                            <i class="fas fa-box mr-1"></i>準備未 <span class="filter-count"></span>
+                        </button>
+                    </div>
+                </div>
+                <div class="order-list" id="plant-orders">
+                    <!-- JavaScriptで動的に生成 -->
+                </div>
+            </div>
+            
+
+            <div id="tab-all" class="tab-content">
+                <div class="order-list" id="all-orders">
+                    <!-- JavaScriptで動的に生成 -->
+                </div>
+            </div>
+            
+            <div id="tab-search" class="tab-content">
+                <div class="bg-white rounded-lg shadow-sm p-4 mb-4">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label class="input-label">検索キーワード</label>
+                            <input type="text" id="search-keyword" class="input-field" placeholder="名前、商品名、備考、住所など何でも検索">
+                        </div>
+                        <div>
+                            <label class="input-label">状態</label>
+                            <select id="search-status" class="input-field">
+                                <option value="">すべて</option>
+                                <option value="incomplete">未完了</option>
+                                <option value="completed">完了済み</option>
+                            </select>
+                        </div>
+                        <div class="flex items-end">
+                            <button onclick="app.searchOrders()" class="btn-primary w-full">
+                                <i class="fas fa-search mr-2"></i>検索
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div id="search-result-info" class="hidden mb-4 p-3 bg-blue-50 border-l-4 border-blue-400 rounded-r">
+                    <p class="text-sm text-blue-900">
+                        <i class="fas fa-info-circle mr-2"></i>
+                        <span id="search-result-count"></span>
+                    </p>
+                </div>
+                <div class="order-list" id="search-results">
+                    <!-- JavaScriptで動的に生成 -->
+                </div>
+            </div>
+            
+            <div id="tab-completed" class="tab-content">
+                <div class="order-list" id="completed-orders">
+                    <!-- JavaScriptで動的に生成 -->
+                </div>
+            </div>
+            
+        </main>
+        
+        <!-- モーダル -->
+        <div id="modal" class="modal hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 id="modal-title" class="text-lg font-bold text-forest"></h3>
+                    <button onclick="app.closeModal()" class="text-gray-500 hover:text-gray-700">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div id="modal-body" class="modal-body">
+                    <!-- 動的に生成 -->
+                </div>
+            </div>
+        </div>
+        
+        <!-- トースト通知 -->
+        <div id="toast" class="toast hidden">
+            <span id="toast-message"></span>
+        </div>
+        
+        <!-- ローディング -->
+        <div id="loading" class="loading hidden">
+            <div class="spinner"></div>
+        </div>
+        
+    </div>
+    
+    <!-- Supabase設定と認証 -->
+    <script src="supabase-config.js"></script>
+    <script src="auth.js"></script>
+    <script src="database.js"></script>
+    
+    <!-- メインアプリケーション -->
+    <script src="app.js"></script>
+    
+    <!-- 認証チェック -->
+    <script>
+        // ページロード時の認証チェック
+        window.addEventListener('DOMContentLoaded', async () => {
+            console.log('Index page: Starting authentication check');
+            
+            try {
+                // 認証マネージャーの初期化を待つ
+                const auth = await getAuthManager();
+                console.log('Index page: AuthManager obtained', auth);
+                
+                if (!auth) {
+                    console.log('Index page: No AuthManager, redirecting to login');
+                    window.location.href = 'login.html';
+                    return;
+                }
+                
+                // 認証状態を確認（少し遅延させて状態安定化を待つ）
+                setTimeout(() => {
+                    const user = auth.getUser();
+                    console.log('Index page: Current user', user);
+                    
+                    if (!user) {
+                        console.log('Index page: No user found, redirecting to login');
+                        window.location.href = 'login.html';
+                    } else {
+                        console.log('Index page: User authenticated, staying on main page');
+                        // メインアプリケーションの初期化
+                        if (typeof app !== 'undefined' && app.initWithUser) {
+                            app.initWithUser(user);
+                        }
+                    }
+                }, 1000); // 1秒待機して認証状態を安定化
+                
+            } catch (error) {
+                console.error('Index page: Authentication check failed', error);
+                window.location.href = 'login.html';
+            }
+        });
+    </script>
+</body>
+</html>
