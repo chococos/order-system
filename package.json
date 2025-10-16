@@ -1,5 +1,12 @@
 {
   "name": "order-sheet-system",
   "version": "0.9.0",
-  "description": "お花屋さん向けオーダー管理システム"
+  "description": "お花屋さん向けオーダー管理システム",
+  "scripts": {
+    "build": "echo 'No build required for static site'",
+    "dev": "echo 'Static site - no dev server required'"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  }
 }
