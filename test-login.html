@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ログインテスト</title>
+    
+    <!-- Supabase SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 400px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #666;
+            font-weight: 500;
+        }
+        input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        button {
+            width: 100%;
+            padding: 12px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-bottom: 10px;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .error {
+            background: #ffebee;
+            color: #c62828;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            display: none;
+        }
+        .success {
+            background: #e8f5e9;
+            color: #2e7d32;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            display: none;
+        }
+        .info {
+            background: #e3f2fd;
+            color: #1565c0;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .status {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f9f9f9;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        .status h3 {
+            margin-top: 0;
+            color: #666;
+        }
+        pre {
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 3px;
+            overflow-x: auto;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔐 ログインテスト</h1>
+        
+        <div id="error-message" class="error"></div>
+        <div id="success-message" class="success"></div>
+        
+        <div class="info">
+            <strong>テストアカウント：</strong><br>
+            Email: test@example.com<br>
+            Password: test1234<br>
+            （まだ作成していない場合は「新規登録」をクリック）
+        </div>
+        
+        <div class="form-group">
+            <label for="email">メールアドレス</label>
+            <input type="email" id="email" value="test@example.com" placeholder="your@email.com">
+        </div>
+        
+        <div class="form-group">
+            <label for="password">パスワード</label>
+            <input type="password" id="password" value="test1234" placeholder="パスワード（8文字以上）">
+        </div>
+        
+        <button onclick="signIn()">ログイン</button>
+        <button onclick="signUp()">新規登録</button>
+        <button onclick="signOut()">ログアウト</button>
+        <button onclick="checkSession()">セッション確認</button>
+        <button onclick="testConnection()">接続テスト</button>
+        
+        <div class="status">
+            <h3>現在の状態</h3>
+            <div id="status-info">確認中...</div>
+        </div>
+    </div>
+    
+    <!-- Supabase設定 -->
+    <script src="supabase-config.js"></script>
+    
+    <script>
+        // エラーメッセージ表示
+        function showError(message) {
+            const errorEl = document.getElementById('error-message');
+            errorEl.textContent = '❌ ' + message;
+            errorEl.style.display = 'block';
+            document.getElementById('success-message').style.display = 'none';
+        }
+        
+        // 成功メッセージ表示
+        function showSuccess(message) {
+            const successEl = document.getElementById('success-message');
+            successEl.textContent = '✅ ' + message;
+            successEl.style.display = 'block';
+            document.getElementById('error-message').style.display = 'none';
+        }
+        
+        // ステータス更新
+        function updateStatus(html) {
+            document.getElementById('status-info').innerHTML = html;
+        }
+        
+        // ログイン
+        async function signIn() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            
+            if (!email || !password) {
+                showError('メールアドレスとパスワードを入力してください');
+                return;
+            }
+            
+            try {
+                updateStatus('ログイン中...');
+                
+                const { data, error } = await supabase.auth.signInWithPassword({
+                    email: email,
+                    password: password
+                });
+                
+                if (error) {
+                    showError(`ログインエラー: ${error.message}`);
+                    updateStatus(`<pre>Error: ${JSON.stringify(error, null, 2)}</pre>`);
+                } else {
+                    showSuccess('ログインに成功しました！');
+                    updateStatus(`
+                        <strong>ログイン済み</strong><br>
+                        User ID: ${data.user?.id}<br>
+                        Email: ${data.user?.email}<br>
+                        <pre>${JSON.stringify(data.user, null, 2)}</pre>
+                    `);
+                }
+            } catch (error) {
+                showError('予期しないエラー: ' + error.message);
+                console.error(error);
+            }
+        }
+        
+        // 新規登録
+        async function signUp() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            
+            if (!email || !password) {
+                showError('メールアドレスとパスワードを入力してください');
+                return;
+            }
+            
+            if (password.length < 8) {
+                showError('パスワードは8文字以上にしてください');
+                return;
+            }
+            
+            try {
+                updateStatus('アカウント作成中...');
+                
+                const { data, error } = await supabase.auth.signUp({
+                    email: email,
+                    password: password,
+                    options: {
+                        emailRedirectTo: window.location.origin
+                    }
+                });
+                
+                if (error) {
+                    showError(`登録エラー: ${error.message}`);
+                    updateStatus(`<pre>Error: ${JSON.stringify(error, null, 2)}</pre>`);
+                } else {
+                    showSuccess('アカウントを作成しました！メール確認が必要な場合があります。');
+                    updateStatus(`
+                        <strong>登録完了</strong><br>
+                        User ID: ${data.user?.id}<br>
+                        Email: ${data.user?.email}<br>
+                        確認メール送信: ${data.user?.email_confirmed_at ? '確認済み' : '未確認'}
+                    `);
+                    
+                    // 自動的にログインを試みる
+                    setTimeout(() => signIn(), 1000);
+                }
+            } catch (error) {
+                showError('予期しないエラー: ' + error.message);
+                console.error(error);
+            }
+        }
+        
+        // ログアウト
+        async function signOut() {
+            try {
+                const { error } = await supabase.auth.signOut();
+                
+                if (error) {
+                    showError('ログアウトエラー: ' + error.message);
+                } else {
+                    showSuccess('ログアウトしました');
+                    updateStatus('未ログイン');
+                }
+            } catch (error) {
+                showError('予期しないエラー: ' + error.message);
+            }
+        }
+        
+        // セッション確認
+        async function checkSession() {
+            try {
+                const { data: { session }, error } = await supabase.auth.getSession();
+                
+                if (error) {
+                    showError('セッション確認エラー: ' + error.message);
+                } else if (session) {
+                    showSuccess('有効なセッションがあります');
+                    updateStatus(`
+                        <strong>セッション情報</strong><br>
+                        User ID: ${session.user?.id}<br>
+                        Email: ${session.user?.email}<br>
+                        有効期限: ${new Date(session.expires_at * 1000).toLocaleString('ja-JP')}
+                    `);
+                } else {
+                    showError('セッションがありません（ログインしてください）');
+                    updateStatus('未ログイン');
+                }
+            } catch (error) {
+                showError('予期しないエラー: ' + error.message);
+            }
+        }
+        
+        // 接続テスト
+        async function testConnection() {
+            try {
+                updateStatus('接続テスト中...');
+                
+                // Supabaseクライアントの存在確認
+                if (!supabase) {
+                    throw new Error('Supabaseクライアントが初期化されていません');
+                }
+                
+                // 認証サービスの確認
+                const { data: { session } } = await supabase.auth.getSession();
+                
+                // データベース接続テスト（RLSが無効な場合のみ動作）
+                const { data, error } = await supabase
+                    .from('orders')
+                    .select('count')
+                    .limit(1);
+                
+                let dbStatus = '接続OK';
+                if (error) {
+                    if (error.message.includes('JWT')) {
+                        dbStatus = '認証が必要（RLSが有効）';
+                    } else {
+                        dbStatus = 'エラー: ' + error.message;
+                    }
+                }
+                
+                updateStatus(`
+                    <strong>接続テスト結果</strong><br>
+                    Supabase URL: ${SUPABASE_CONFIG.url}<br>
+                    クライアント: ✅ 初期化済み<br>
+                    認証サービス: ✅ 利用可能<br>
+                    データベース: ${dbStatus}<br>
+                    セッション: ${session ? '✅ あり' : '❌ なし'}
+                `);
+                
+                showSuccess('接続テスト完了');
+            } catch (error) {
+                showError('接続テストエラー: ' + error.message);
+                updateStatus(`<pre>Error: ${error.stack}</pre>`);
+            }
+        }
+        
+        // ページ読み込み時にセッション確認
+        window.addEventListener('DOMContentLoaded', () => {
+            setTimeout(() => {
+                checkSession();
+            }, 500);
+        });
+    </script>
+</body>
+</html>
