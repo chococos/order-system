@@ -46,6 +46,48 @@
     </script>
     
     <link rel="stylesheet" href="style.css">
+    
+    <!-- ログインスキップ設定 -->
+    <script>
+        // ログインなしで使用する場合はtrueに設定
+        const SKIP_LOGIN_REQUIREMENT = true;
+        const USE_LOCAL_STORAGE_ONLY = false; // trueにすると完全ローカルモード
+        
+        // ログインスキップ時の初期化
+        if (SKIP_LOGIN_REQUIREMENT) {
+            console.log('ログインスキップモードで起動');
+            
+            window.addEventListener('DOMContentLoaded', () => {
+                // ログインボタンを非表示
+                const logoutBtn = document.querySelector('.logout-btn');
+                if (logoutBtn) {
+                    logoutBtn.style.display = 'none';
+                }
+                
+                // 認証ステータスを更新
+                const authStatus = document.getElementById('auth-status');
+                if (authStatus) {
+                    if (USE_LOCAL_STORAGE_ONLY) {
+                        authStatus.textContent = '📱 ローカルモード';
+                        authStatus.style.color = '#FF9800';
+                    } else {
+                        authStatus.textContent = '🌐 オンラインモード（ログイン不要）';
+                        authStatus.style.color = '#4CAF50';
+                    }
+                }
+                
+                // ローカルモードの場合、同期を無効化
+                if (USE_LOCAL_STORAGE_ONLY) {
+                    if (typeof syncManager !== 'undefined') {
+                        syncManager.syncStatus.isOnline = false;
+                    }
+                    if (typeof db !== 'undefined') {
+                        db.isOnline = false;
+                    }
+                }
+            });
+        }
+    </script>
 </head>
 <body class="bg-cream">
     
