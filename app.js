@@ -4606,17 +4606,23 @@ class OrderSystem {
     }
 }
 
-// アプリケーション初期化（シングルトンパターン）
+// アプリケーション初期化関数
 let app;
-document.addEventListener('DOMContentLoaded', () => {
+
+// Firebase初期化完了後に呼び出す初期化関数
+function initializeApp() {
     // 既にインスタンスが存在する場合は新規作成しない
     if (window.app && window.app instanceof OrderSystem) {
         console.log('OrderSystem instance already exists, skipping creation');
         app = window.app;
-        return;
+        return app;
     }
     
     console.log('Creating new OrderSystem instance');
     app = new OrderSystem();
     window.app = app; // グローバルスコープでも利用可能にする
-});
+    return app;
+}
+
+// グローバルにエクスポート
+window.initializeApp = initializeApp;
