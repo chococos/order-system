@@ -6,12 +6,13 @@ const FIREBASE_CONFIG = {
     // https://console.firebase.google.com/ でプロジェクトを選択
     // 歯車アイコン → プロジェクトの設定 → 下にスクロール → SDK の設定と構成
     
-    apiKey: "YOUR_API_KEY_HERE",
-    authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-    projectId: "YOUR_PROJECT_ID",
-    storageBucket: "YOUR_PROJECT_ID.appspot.com",
-    messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-    appId: "YOUR_APP_ID"
+    apiKey: "AIzaSyD_A7Iu1VYqoshjKNYU-aX4arISA7fzwl8",
+    authDomain: "order-sheet-79512.firebaseapp.com",
+    projectId: "order-sheet-79512",
+    storageBucket: "order-sheet-79512.firebasestorage.app",
+    messagingSenderId: "780335659501",
+    appId: "1:780335659501:web:5f0ab715de2714ae1a0fe4",
+    measurementId: "G-WXK85L6TKQ"
 };
 
 // Firebase初期化の状態管理
