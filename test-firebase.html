@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Firebase 動作テスト</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        .section {
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+        }
+
+        .section h2 {
+            color: #444;
+            margin-bottom: 15px;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .status {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .status.pending {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin: 5px;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #c82333;
+        }
+
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #218838;
+        }
+
+        .input-group {
+            margin-bottom: 15px;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #555;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .input-group input {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        .input-group input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .log {
+            background: #1e1e1e;
+            color: #00ff00;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+            margin-top: 15px;
+        }
+
+        .log-entry {
+            margin-bottom: 5px;
+            word-wrap: break-word;
+        }
+
+        .user-info {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+        }
+
+        .user-info p {
+            margin: 5px 0;
+            font-size: 14px;
+            color: #555;
+        }
+
+        .orders-list {
+            margin-top: 15px;
+        }
+
+        .order-item {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            border-left: 4px solid #667eea;
+        }
+
+        .order-item h4 {
+            color: #333;
+            margin-bottom: 8px;
+        }
+
+        .order-item p {
+            color: #666;
+            font-size: 13px;
+            margin: 4px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔥 Firebase 動作テスト</h1>
+        <p class="subtitle">Firebase接続と基本機能のテストページ</p>
+
+        <!-- 接続テスト -->
+        <div class="section">
+            <h2>
+                1. 接続テスト
+                <span id="connection-status" class="status pending">未テスト</span>
+            </h2>
+            <button class="btn btn-primary" onclick="testConnection()">接続テスト実行</button>
+            <div id="connection-log" class="log" style="display: none;"></div>
+        </div>
+
+        <!-- 認証テスト -->
+        <div class="section">
+            <h2>
+                2. 認証テスト
+                <span id="auth-status" class="status pending">未ログイン</span>
+            </h2>
+            
+            <div class="input-group">
+                <label>メールアドレス</label>
+                <input type="email" id="email" placeholder="test@example.com">
+            </div>
+            
+            <div class="input-group">
+                <label>パスワード（6文字以上）</label>
+                <input type="password" id="password" placeholder="••••••">
+            </div>
+
+            <button class="btn btn-success" onclick="signUp()">アカウント作成</button>
+            <button class="btn btn-primary" onclick="signIn()">ログイン</button>
+            <button class="btn btn-danger" onclick="signOut()">ログアウト</button>
+
+            <div id="user-info" class="user-info" style="display: none;"></div>
+            <div id="auth-log" class="log" style="display: none;"></div>
+        </div>
+
+        <!-- データベーステスト -->
+        <div class="section">
+            <h2>
+                3. データベーステスト
+                <span id="db-status" class="status pending">未テスト</span>
+            </h2>
+
+            <button class="btn btn-primary" onclick="createTestOrder()">テストオーダー作成</button>
+            <button class="btn btn-primary" onclick="loadOrders()">オーダー一覧取得</button>
+            <button class="btn btn-danger" onclick="deleteAllOrders()">全オーダー削除</button>
+
+            <div id="orders-list" class="orders-list"></div>
+            <div id="db-log" class="log" style="display: none;"></div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+
+    <!-- アプリスクリプト -->
+    <script src="firebase-config.js"></script>
+    <script src="firebase-auth.js"></script>
+    <script src="firebase-database.js"></script>
+
+    <script>
+        let authManager = null;
+        let dbManager = null;
+
+        // ログ出力
+        function addLog(elementId, message, type = 'info') {
+            const logElement = document.getElementById(elementId);
+            logElement.style.display = 'block';
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            const timestamp = new Date().toLocaleTimeString();
+            const icon = type === 'error' ? '❌' : type === 'success' ? '✅' : '📝';
+            entry.textContent = `[${timestamp}] ${icon} ${message}`;
+            logElement.appendChild(entry);
+            logElement.scrollTop = logElement.scrollHeight;
+        }
+
+        // 初期化
+        async function initialize() {
+            try {
+                addLog('connection-log', 'Firebase初期化中...', 'info');
+                
+                await initializeFirebase();
+                authManager = await initializeAuthManager();
+                dbManager = await initializeDatabaseManager();
+
+                if (!authManager || !dbManager) {
+                    throw new Error('初期化に失敗しました');
+                }
+
+                addLog('connection-log', 'Firebase初期化成功！', 'success');
+
+                // 認証状態監視
+                authManager.onAuthStateChanged((user) => {
+                    updateAuthStatus(user);
+                });
+
+                return true;
+            } catch (error) {
+                addLog('connection-log', `初期化エラー: ${error.message}`, 'error');
+                return false;
+            }
+        }
+
+        // 接続テスト
+        async function testConnection() {
+            const statusEl = document.getElementById('connection-status');
+            addLog('connection-log', '接続テスト開始...', 'info');
+
+            const success = await initialize();
+
+            if (success) {
+                statusEl.className = 'status success';
+                statusEl.textContent = '接続成功 ✅';
+                addLog('connection-log', 'すべてのテストに合格しました！', 'success');
+            } else {
+                statusEl.className = 'status error';
+                statusEl.textContent = '接続失敗 ❌';
+                addLog('connection-log', '設定を確認してください', 'error');
+            }
+        }
+
+        // 認証状態表示更新
+        function updateAuthStatus(user) {
+            const statusEl = document.getElementById('auth-status');
+            const userInfoEl = document.getElementById('user-info');
+
+            if (user) {
+                statusEl.className = 'status success';
+                statusEl.textContent = 'ログイン中 ✅';
+                
+                userInfoEl.style.display = 'block';
+                userInfoEl.innerHTML = `
+                    <p><strong>ユーザーID:</strong> ${user.uid}</p>
+                    <p><strong>メール:</strong> ${user.email || '（匿名）'}</p>
+                    <p><strong>ログイン時刻:</strong> ${new Date().toLocaleString()}</p>
+                `;
+                
+                addLog('auth-log', `ログイン: ${user.email || user.uid}`, 'success');
+            } else {
+                statusEl.className = 'status pending';
+                statusEl.textContent = '未ログイン';
+                userInfoEl.style.display = 'none';
+                addLog('auth-log', 'ログアウトしました', 'info');
+            }
+        }
+
+        // アカウント作成
+        async function signUp() {
+            if (!authManager) await initialize();
+            
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+
+            if (!email || !password) {
+                addLog('auth-log', 'メールアドレスとパスワードを入力してください', 'error');
+                return;
+            }
+
+            addLog('auth-log', `アカウント作成中: ${email}`, 'info');
+            const result = await authManager.signUp(email, password);
+
+            if (result.success) {
+                addLog('auth-log', 'アカウント作成成功！', 'success');
+            } else {
+                addLog('auth-log', `エラー: ${result.error}`, 'error');
+            }
+        }
+
+        // ログイン
+        async function signIn() {
+            if (!authManager) await initialize();
+            
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+
+            if (!email || !password) {
+                addLog('auth-log', 'メールアドレスとパスワードを入力してください', 'error');
+                return;
+            }
+
+            addLog('auth-log', `ログイン中: ${email}`, 'info');
+            const result = await authManager.signIn(email, password);
+
+            if (result.success) {
+                addLog('auth-log', 'ログイン成功！', 'success');
+            } else {
+                addLog('auth-log', `エラー: ${result.error}`, 'error');
+            }
+        }
+
+        // ログアウト
+        async function signOut() {
+            if (!authManager) return;
+
+            addLog('auth-log', 'ログアウト中...', 'info');
+            const result = await authManager.signOut();
+
+            if (result.success) {
+                addLog('auth-log', 'ログアウト成功', 'success');
+            }
+        }
+
+        // テストオーダー作成
+        async function createTestOrder() {
+            if (!dbManager) await initialize();
+            if (!authManager?.isSignedIn()) {
+                addLog('db-log', 'ログインしてください', 'error');
+                return;
+            }
+
+            const testOrder = {
+                customer_name: 'テスト顧客' + Math.floor(Math.random() * 1000),
+                product_name: 'ドライフラワー',
+                quantity: 1,
+                delivery_date: new Date().toISOString().split('T')[0],
+                delivery_location: '東京都',
+                notes: 'Firebaseテスト用オーダー'
+            };
+
+            addLog('db-log', 'オーダー作成中...', 'info');
+            const result = await dbManager.createOrder(testOrder);
+
+            if (result.success) {
+                document.getElementById('db-status').className = 'status success';
+                document.getElementById('db-status').textContent = 'テスト成功 ✅';
+                addLog('db-log', `オーダー作成成功: ${result.id}`, 'success');
+                await loadOrders();
+            } else {
+                addLog('db-log', `エラー: ${result.error}`, 'error');
+            }
+        }
+
+        // オーダー一覧取得
+        async function loadOrders() {
+            if (!dbManager) await initialize();
+            if (!authManager?.isSignedIn()) {
+                addLog('db-log', 'ログインしてください', 'error');
+                return;
+            }
+
+            addLog('db-log', 'オーダー一覧取得中...', 'info');
+            const result = await dbManager.getOrders();
+
+            const listEl = document.getElementById('orders-list');
+
+            if (result.success) {
+                addLog('db-log', `${result.count}件のオーダーを取得`, 'success');
+                
+                if (result.data.length === 0) {
+                    listEl.innerHTML = '<p style="color: #999; padding: 20px; text-align: center;">オーダーがありません</p>';
+                } else {
+                    listEl.innerHTML = result.data.map(order => `
+                        <div class="order-item">
+                            <h4>${order.customer_name}</h4>
+                            <p><strong>商品:</strong> ${order.product_name}</p>
+                            <p><strong>数量:</strong> ${order.quantity}</p>
+                            <p><strong>配送日:</strong> ${order.delivery_date}</p>
+                            <p><strong>配送先:</strong> ${order.delivery_location}</p>
+                            ${order.notes ? `<p><strong>備考:</strong> ${order.notes}</p>` : ''}
+                        </div>
+                    `).join('');
+                }
+            } else {
+                addLog('db-log', `エラー: ${result.error}`, 'error');
+            }
+        }
+
+        // 全オーダー削除
+        async function deleteAllOrders() {
+            if (!dbManager) await initialize();
+            if (!authManager?.isSignedIn()) {
+                addLog('db-log', 'ログインしてください', 'error');
+                return;
+            }
+
+            if (!confirm('本当に全オーダーを削除しますか？')) {
+                return;
+            }
+
+            const result = await dbManager.getOrders();
+            if (!result.success) {
+                addLog('db-log', 'オーダー取得エラー', 'error');
+                return;
+            }
+
+            addLog('db-log', `${result.data.length}件のオーダーを削除中...`, 'info');
+
+            for (const order of result.data) {
+                await dbManager.deleteOrder(order.id);
+            }
+
+            addLog('db-log', '全オーダー削除完了', 'success');
+            await loadOrders();
+        }
+
+        // ページ読み込み時に初期化
+        window.addEventListener('load', () => {
+            console.log('Firebase テストページ読み込み完了');
+        });
+    </script>
+</body>
+</html>

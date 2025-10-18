@@ -1,0 +1,28 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // orders コレクション
+    match /orders/{orderId} {
+      // 読み取り: ログインユーザーが自分のデータのみアクセス可能
+      allow read: if request.auth != null 
+                  && request.auth.uid == resource.data.user_id;
+      
+      // 作成: ログインユーザーが自分のuser_idでのみ作成可能
+      allow create: if request.auth != null 
+                   && request.auth.uid == request.resource.data.user_id;
+      
+      // 更新: ログインユーザーが自分のデータのみ更新可能
+      allow update: if request.auth != null 
+                   && request.auth.uid == resource.data.user_id;
+      
+      // 削除: ログインユーザーが自分のデータのみ削除可能
+      allow delete: if request.auth != null 
+                   && request.auth.uid == resource.data.user_id;
+    }
+    
+    // users コレクション（将来使用する可能性のため）
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+  }
+}

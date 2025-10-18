@@ -2,10 +2,8 @@
   "buildCommand": "",
   "outputDirectory": ".",
   "framework": null,
-  "routes": [
-    { "src": "/", "dest": "/index.html" },
-    { "src": "/login", "dest": "/login.html" },
-    { "src": "/(.*\\.(js|css|html|json|sql|md))", "dest": "/$1" }
+  "rewrites": [
+    { "source": "/login", "destination": "/login.html" }
   ],
   "headers": [
     {

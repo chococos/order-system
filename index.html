@@ -16,15 +16,16 @@
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     
-    <!-- Supabase SDK（オプション：Supabaseを使用する場合のみ必要） -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Firebase SDK (v9 compat版) -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
     
-    <!-- 同期システムスクリプト -->
-    <script src="supabase-config.js"></script>
-    <script src="sync-manager.js"></script>
-    <script src="database-enhanced.js"></script>
-    <script src="sync-ui.js"></script>
-    <script src="sync-config-update.js"></script>
+    <!-- Firebase設定とマネージャー -->
+    <script src="firebase-config.js"></script>
+    <script src="firebase-auth.js"></script>
+    <script src="firebase-database.js"></script>
+    <script src="firebase-adapter.js"></script>
     
     <script>
         tailwind.config = {
@@ -801,42 +802,50 @@
     <!-- メインアプリケーション -->
     <script src="app.js"></script>
     
-    <!-- 認証チェック -->
+    <!-- Firebase認証チェック -->
     <script>
         // ページロード時の認証チェック
         window.addEventListener('DOMContentLoaded', async () => {
-            console.log('Index page: Starting authentication check');
+            console.log('Index page: Starting Firebase authentication check');
+            
+            // ログインスキップモードの確認
+            if (SKIP_LOGIN_REQUIREMENT) {
+                console.log('Index page: Login skip mode enabled');
+                return;
+            }
             
             try {
-                // 認証マネージャーの初期化を待つ
-                const auth = await getAuthManager();
-                console.log('Index page: AuthManager obtained', auth);
+                // Firebase初期化
+                await initializeFirebase();
+                const authManager = await initializeAuthManager();
                 
-                if (!auth) {
+                if (!authManager) {
                     console.log('Index page: No AuthManager, redirecting to login');
                     window.location.href = 'login.html';
                     return;
                 }
                 
+                console.log('Index page: Firebase AuthManager initialized');
+                
                 // 認証状態を確認（少し遅延させて状態安定化を待つ）
                 setTimeout(() => {
-                    const user = auth.getUser();
+                    const user = authManager.getCurrentUser();
                     console.log('Index page: Current user', user);
                     
                     if (!user) {
                         console.log('Index page: No user found, redirecting to login');
                         window.location.href = 'login.html';
                     } else {
-                        console.log('Index page: User authenticated, staying on main page');
+                        console.log('Index page: User authenticated:', user.email);
                         // メインアプリケーションの初期化
                         if (typeof app !== 'undefined' && app.initWithUser) {
                             app.initWithUser(user);
                         }
                     }
-                }, 1000); // 1秒待機して認証状態を安定化
+                }, 500); // 0.5秒待機して認証状態を安定化
                 
             } catch (error) {
-                console.error('Index page: Authentication check failed', error);
+                console.error('Index page: Firebase authentication check failed', error);
                 window.location.href = 'login.html';
             }
         });
