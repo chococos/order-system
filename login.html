@@ -14,8 +14,10 @@
     <!-- Custom CSS -->
     <link rel="stylesheet" href="style.css">
     
-    <!-- Supabase SDK（オプション：Supabaseを使用する場合のみ必要） -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Firebase SDK (v9 compat版) -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
     
     <style>
         .login-container {
@@ -149,24 +151,28 @@
     </div>
     
     <!-- Scripts -->
-    <script src="supabase-config.js"></script>
-    <script src="auth.js"></script>
+    <script src="firebase-config.js"></script>
+    <script src="firebase-auth.js"></script>
+    <script src="firebase-database.js"></script>
     <script>
+        let authManager = null;
+
         // ページロード時の処理
         window.addEventListener('DOMContentLoaded', async () => {
-            console.log('Login page: Starting initialization');
+            console.log('Login page: Starting Firebase initialization');
             
             try {
-                // 認証マネージャーの初期化を待つ
-                const auth = await getAuthManager();
-                console.log('Login page: AuthManager obtained', auth);
+                // Firebase初期化
+                await initializeFirebase();
+                authManager = await initializeAuthManager();
+                console.log('Login page: Firebase initialized');
                 
                 // モード表示
                 updateModeIndicator();
                 
                 // 既にログイン済みの場合はメイン画面へ
-                if (auth) {
-                    const user = auth.getUser();
+                if (authManager) {
+                    const user = authManager.getCurrentUser();
                     console.log('Login page: Current user', user);
                     
                     if (user) {
@@ -175,17 +181,11 @@
                     }
                 }
             } catch (error) {
-                console.error('Login page: Initialization failed', error);
+                console.error('Login page: Firebase initialization failed', error);
                 // エラー時はログインページを表示継続
                 updateModeIndicator();
             }
         });
-
-        // 認証マネージャーの初期化を待機（使用されていないため削除予定）
-        async function waitForAuthManager() {
-            console.warn('waitForAuthManager is deprecated, use getAuthManager() directly');
-            return await getAuthManager();
-        }
         
         // モードインジケーター更新
         function updateModeIndicator() {
@@ -193,9 +193,9 @@
             const modeText = document.getElementById('mode-text');
             const icon = indicator.querySelector('i');
             
-            if (typeof supabase !== 'undefined' && supabase) {
+            if (authManager && isFirebaseAvailable()) {
                 icon.className = 'fas fa-circle mr-2 text-green-400';
-                modeText.textContent = 'オンラインモード';
+                modeText.textContent = 'Firebase オンラインモード';
             } else {
                 icon.className = 'fas fa-circle mr-2 text-yellow-400';
                 modeText.textContent = 'オフラインモード（LocalStorage）';
@@ -212,13 +212,12 @@
             showMessage('info', 'ログイン中...');
             
             try {
-                const auth = await getAuthManager();
-                if (!auth) {
-                    throw new Error('認証マネージャーが初期化されていません');
+                if (!authManager) {
+                    throw new Error('Firebase認証マネージャーが初期化されていません');
                 }
                 
-                console.log('Login: Attempting login for', email);
-                const result = await auth.login(email, password);
+                console.log('Login: Attempting Firebase login for', email);
+                const result = await authManager.signIn(email, password);
                 console.log('Login: Result', result);
                 
                 if (result.success) {
@@ -229,7 +228,7 @@
                     setTimeout(() => {
                         console.log('Login: Redirecting to main page');
                         window.location.href = 'index.html';
-                    }, 1500); // 1.5秒待機
+                    }, 1000); // 1秒待機
                 } else {
                     console.error('Login: Failed', result.error);
                     showMessage('error', result.error || 'ログインに失敗しました');
@@ -265,18 +264,17 @@
             showMessage('info', 'アカウント作成中...');
             
             try {
-                const auth = await getAuthManager();
-                if (!auth) {
-                    throw new Error('認証マネージャーが初期化されていません');
+                if (!authManager) {
+                    throw new Error('Firebase認証マネージャーが初期化されていません');
                 }
                 
-                console.log('Signup: Attempting signup for', email);
-                const result = await auth.signup(email, password, { name: name });
+                console.log('Signup: Attempting Firebase signup for', email);
+                const result = await authManager.signUp(email, password);
                 console.log('Signup: Result', result);
                 
                 if (result.success) {
-                    showMessage('success', result.message || 'アカウントを作成しました');
-                    hideSignupForm();
+                    showMessage('success', 'アカウントを作成しました。ログインしてください。');
+                    setTimeout(() => hideSignupForm(), 2000);
                 } else {
                     console.error('Signup: Failed', result.error);
                     showMessage('error', result.error || 'アカウント作成に失敗しました');
@@ -290,10 +288,10 @@
         // パスワードリセット
         async function showPasswordReset() {
             const email = prompt('パスワードリセット用のメールアドレスを入力してください：');
-            if (email) {
-                const result = await authManager.resetPassword(email);
+            if (email && authManager) {
+                const result = await authManager.sendPasswordResetEmail(email);
                 if (result.success) {
-                    showMessage('success', result.message);
+                    showMessage('success', 'パスワードリセットメールを送信しました');
                 } else {
                     showMessage('error', result.error);
                 }
