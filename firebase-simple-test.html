@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Firebase シンプルテスト</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        .btn {
+            padding: 12px 24px;
+            margin: 10px 5px;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            background: #4285f4;
+            color: white;
+        }
+        .btn:hover {
+            background: #357ae8;
+        }
+        .log {
+            background: #1e1e1e;
+            color: #00ff00;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 20px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .log-entry {
+            margin-bottom: 5px;
+        }
+        .error {
+            color: #ff4444;
+        }
+        .success {
+            color: #00ff00;
+        }
+        .info {
+            color: #44aaff;
+        }
+        input {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔥 Firebase シンプルテスト</h1>
+        
+        <div>
+            <h3>ステップ1: SDKロード確認</h3>
+            <button class="btn" onclick="checkSDK()">SDK確認</button>
+        </div>
+
+        <div>
+            <h3>ステップ2: Firebase初期化</h3>
+            <button class="btn" onclick="initFirebase()">初期化</button>
+        </div>
+
+        <div>
+            <h3>ステップ3: アカウント作成</h3>
+            <input type="email" id="email" placeholder="メールアドレス" value="test@example.com">
+            <input type="password" id="password" placeholder="パスワード (6文字以上)" value="test1234">
+            <button class="btn" onclick="createAccount()">アカウント作成</button>
+            <button class="btn" onclick="loginAccount()">ログイン</button>
+        </div>
+
+        <div>
+            <h3>ステップ4: データベーステスト</h3>
+            <button class="btn" onclick="createTestOrder()">テストオーダー作成</button>
+            <button class="btn" onclick="getOrders()">オーダー取得</button>
+        </div>
+
+        <div id="log" class="log">
+            <div class="log-entry info">ログ出力エリア</div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK (v9 compat) -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+
+    <script>
+        // ログ出力
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('log');
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            const time = new Date().toLocaleTimeString();
+            entry.textContent = `[${time}] ${message}`;
+            logDiv.appendChild(entry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+            console.log(message);
+        }
+
+        // Firebase設定
+        const firebaseConfig = {
+            apiKey: "AIzaSyD_A7Iu1VYqoshjKNYU-aX4arISA7fzwl8",
+            authDomain: "order-sheet-79512.firebaseapp.com",
+            projectId: "order-sheet-79512",
+            storageBucket: "order-sheet-79512.firebasestorage.app",
+            messagingSenderId: "780335659501",
+            appId: "1:780335659501:web:5f0ab715de2714ae1a0fe4",
+            measurementId: "G-WXK85L6TKQ"
+        };
+
+        let app = null;
+        let auth = null;
+        let db = null;
+
+        // SDKロード確認
+        function checkSDK() {
+            log('=== SDK確認開始 ===', 'info');
+            
+            if (typeof firebase === 'undefined') {
+                log('❌ Firebase SDK が読み込まれていません', 'error');
+                return false;
+            }
+            log('✅ Firebase SDK 読み込み済み', 'success');
+            
+            if (typeof firebase.initializeApp === 'function') {
+                log('✅ firebase.initializeApp 利用可能', 'success');
+            } else {
+                log('❌ firebase.initializeApp が見つかりません', 'error');
+                return false;
+            }
+            
+            log('✅ SDK確認完了！次のステップに進んでください', 'success');
+            return true;
+        }
+
+        // Firebase初期化
+        function initFirebase() {
+            log('=== Firebase初期化開始 ===', 'info');
+            
+            try {
+                if (!checkSDK()) {
+                    return;
+                }
+
+                log('Firebase初期化中...', 'info');
+                app = firebase.initializeApp(firebaseConfig);
+                log('✅ Firebaseアプリ初期化完了', 'success');
+
+                auth = firebase.auth();
+                log('✅ Firebase Auth 初期化完了', 'success');
+
+                db = firebase.firestore();
+                log('✅ Firestore 初期化完了', 'success');
+
+                // オフライン永続化
+                db.enablePersistence({ synchronizeTabs: true })
+                    .then(() => {
+                        log('✅ オフライン永続化有効化', 'success');
+                    })
+                    .catch((err) => {
+                        log('⚠️ 永続化スキップ: ' + err.code, 'info');
+                    });
+
+                // 認証状態監視
+                auth.onAuthStateChanged((user) => {
+                    if (user) {
+                        log(`✅ ログイン中: ${user.email || user.uid}`, 'success');
+                    } else {
+                        log('ℹ️ 未ログイン', 'info');
+                    }
+                });
+
+                log('🎉 Firebase初期化完了！アカウント作成に進んでください', 'success');
+            } catch (error) {
+                log('❌ 初期化エラー: ' + error.message, 'error');
+                console.error(error);
+            }
+        }
+
+        // アカウント作成
+        async function createAccount() {
+            log('=== アカウント作成開始 ===', 'info');
+            
+            if (!auth) {
+                log('❌ まずFirebaseを初期化してください', 'error');
+                return;
+            }
+
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+
+            if (!email || !password) {
+                log('❌ メールとパスワードを入力してください', 'error');
+                return;
+            }
+
+            try {
+                log(`アカウント作成中: ${email}`, 'info');
+                const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+                log('✅ アカウント作成成功！', 'success');
+                log(`ユーザーID: ${userCredential.user.uid}`, 'info');
+            } catch (error) {
+                if (error.code === 'auth/email-already-in-use') {
+                    log('⚠️ このメールは既に使用されています。ログインしてください', 'info');
+                } else {
+                    log('❌ エラー: ' + error.message, 'error');
+                }
+                console.error(error);
+            }
+        }
+
+        // ログイン
+        async function loginAccount() {
+            log('=== ログイン開始 ===', 'info');
+            
+            if (!auth) {
+                log('❌ まずFirebaseを初期化してください', 'error');
+                return;
+            }
+
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+
+            if (!email || !password) {
+                log('❌ メールとパスワードを入力してください', 'error');
+                return;
+            }
+
+            try {
+                log(`ログイン中: ${email}`, 'info');
+                const userCredential = await auth.signInWithEmailAndPassword(email, password);
+                log('✅ ログイン成功！', 'success');
+                log(`ユーザーID: ${userCredential.user.uid}`, 'info');
+            } catch (error) {
+                log('❌ エラー: ' + error.message, 'error');
+                console.error(error);
+            }
+        }
+
+        // テストオーダー作成
+        async function createTestOrder() {
+            log('=== テストオーダー作成開始 ===', 'info');
+            
+            if (!db || !auth) {
+                log('❌ まずFirebaseを初期化してログインしてください', 'error');
+                return;
+            }
+
+            const user = auth.currentUser;
+            if (!user) {
+                log('❌ ログインしてください', 'error');
+                return;
+            }
+
+            try {
+                const orderData = {
+                    user_id: user.uid,
+                    customer_name: 'テスト顧客' + Math.floor(Math.random() * 1000),
+                    product_name: 'ドライフラワー',
+                    quantity: 1,
+                    delivery_date: new Date().toISOString().split('T')[0],
+                    delivery_location: '東京都',
+                    notes: 'Firebaseテスト用',
+                    created_at: firebase.firestore.FieldValue.serverTimestamp(),
+                    updated_at: firebase.firestore.FieldValue.serverTimestamp()
+                };
+
+                log('オーダー作成中...', 'info');
+                const docRef = await db.collection('orders').add(orderData);
+                log('✅ オーダー作成成功！', 'success');
+                log(`オーダーID: ${docRef.id}`, 'info');
+            } catch (error) {
+                log('❌ エラー: ' + error.message, 'error');
+                console.error(error);
+            }
+        }
+
+        // オーダー取得
+        async function getOrders() {
+            log('=== オーダー一覧取得開始 ===', 'info');
+            
+            if (!db || !auth) {
+                log('❌ まずFirebaseを初期化してログインしてください', 'error');
+                return;
+            }
+
+            const user = auth.currentUser;
+            if (!user) {
+                log('❌ ログインしてください', 'error');
+                return;
+            }
+
+            try {
+                log('オーダー取得中...', 'info');
+                const snapshot = await db.collection('orders')
+                    .where('user_id', '==', user.uid)
+                    .orderBy('created_at', 'desc')
+                    .get();
+
+                log(`✅ ${snapshot.size}件のオーダーを取得`, 'success');
+                
+                snapshot.forEach((doc) => {
+                    const data = doc.data();
+                    log(`  📦 ${data.customer_name} - ${data.product_name}`, 'info');
+                });
+            } catch (error) {
+                log('❌ エラー: ' + error.message, 'error');
+                console.error(error);
+            }
+        }
+
+        // ページロード時
+        window.addEventListener('load', () => {
+            log('🔥 Firebase シンプルテストページ読み込み完了', 'success');
+            log('ステップ1から順番に実行してください', 'info');
+        });
+    </script>
+</body>
+</html>
