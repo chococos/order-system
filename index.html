@@ -115,7 +115,7 @@
                                 <button onclick="app.syncData()" class="header-icon-btn" title="データ同期">
                                     <i class="fas fa-sync-alt"></i>
                                 </button>
-                                <button onclick="authManager.logout()" class="header-icon-btn logout-btn" title="ログアウト">
+                                <button onclick="handleLogout()" class="header-icon-btn logout-btn" title="ログアウト">
                                     <i class="fas fa-sign-out-alt"></i>
                                 </button>
                             </div>
@@ -155,7 +155,7 @@
                             <button onclick="app.syncData()" class="p-2 text-sage hover:text-sage-dark transition" title="データ同期">
                                 <i class="fas fa-sync-alt"></i>
                             </button>
-                            <button onclick="authManager.logout()" class="p-2 text-red-500 hover:text-red-600 transition" title="ログアウト">
+                            <button onclick="handleLogout()" class="p-2 text-red-500 hover:text-red-600 transition" title="ログアウト">
                                 <i class="fas fa-sign-out-alt"></i>
                             </button>
                         </div>
@@ -794,16 +794,31 @@
         
     </div>
     
-    <!-- Supabase設定と認証 -->
-    <script src="supabase-config.js"></script>
-    <script src="auth.js"></script>
-    <script src="database.js"></script>
-    
     <!-- メインアプリケーション -->
     <script src="app.js"></script>
     
     <!-- Firebase認証チェック -->
     <script>
+        // ログアウト処理
+        async function handleLogout() {
+            try {
+                const authManager = getAuthManager();
+                if (authManager) {
+                    const result = await authManager.signOut();
+                    if (result.success) {
+                        console.log('Logout successful');
+                        window.location.href = 'login.html';
+                    } else {
+                        console.error('Logout failed:', result.error);
+                        alert('ログアウトに失敗しました: ' + result.error);
+                    }
+                }
+            } catch (error) {
+                console.error('Logout error:', error);
+                alert('ログアウト処理でエラーが発生しました');
+            }
+        }
+
         // ページロード時の認証チェック
         window.addEventListener('DOMContentLoaded', async () => {
             console.log('Index page: Starting Firebase authentication check');
