@@ -168,16 +168,23 @@
                 // モード表示
                 updateModeIndicator();
                 
+                // 認証状態の安定化を待つ（重要！）
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                
                 // 既にログイン済みの場合はメイン画面へ
                 const authMgr = getAuthManager();
                 if (authMgr) {
                     const user = authMgr.getCurrentUser();
-                    console.log('Login page: Current user', user);
+                    console.log('Login page: Current user after wait', user);
                     
                     if (user) {
                         console.log('Login page: User already authenticated, redirecting to main page');
                         window.location.href = 'index.html';
+                    } else {
+                        console.log('Login page: No user, staying on login page');
                     }
+                } else {
+                    console.log('Login page: No auth manager, staying on login page');
                 }
             } catch (error) {
                 console.error('Login page: Firebase initialization failed', error);

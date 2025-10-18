@@ -819,6 +819,9 @@
             }
         }
 
+        // リダイレクトフラグ（無限ループ防止）
+        let isRedirecting = false;
+
         // ページロード時の認証チェック
         window.addEventListener('DOMContentLoaded', async () => {
             console.log('Index page: Starting Firebase authentication check');
@@ -841,25 +844,34 @@
                 
                 if (!authManager) {
                     console.log('Index page: No AuthManager, redirecting to login');
-                    window.location.href = 'login.html';
+                    if (!isRedirecting) {
+                        isRedirecting = true;
+                        window.location.href = 'login.html';
+                    }
                     return;
                 }
                 
                 console.log('Index page: Firebase AuthManager initialized');
                 
-                // 3. 認証状態を確認
+                // 3. 認証状態の安定化を待つ（重要！）
+                await new Promise(resolve => setTimeout(resolve, 500));
+                
+                // 4. 認証状態を確認
                 const user = authManager.getCurrentUser();
-                console.log('Index page: Current user', user);
+                console.log('Index page: Current user after wait', user);
                 
                 if (!user) {
                     console.log('Index page: No user found, redirecting to login');
-                    window.location.href = 'login.html';
+                    if (!isRedirecting) {
+                        isRedirecting = true;
+                        window.location.href = 'login.html';
+                    }
                     return;
                 }
                 
                 console.log('Index page: User authenticated:', user.email);
                 
-                // 4. メインアプリケーションの初期化（Firebase完全初期化後）
+                // 5. メインアプリケーションの初期化（Firebase完全初期化後）
                 const app = initializeApp();
                 if (app && app.initWithUser) {
                     app.initWithUser(user);
@@ -867,7 +879,10 @@
                 
             } catch (error) {
                 console.error('Index page: Firebase authentication check failed', error);
-                window.location.href = 'login.html';
+                if (!isRedirecting) {
+                    isRedirecting = true;
+                    window.location.href = 'login.html';
+                }
             }
         });
     </script>
